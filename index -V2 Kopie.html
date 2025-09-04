@@ -93,6 +93,10 @@
                 <div><label for="propLineSpacing" class="block config-label mb-1">Zeilenabst.:</label><input type="number" id="propLineSpacing" value="5.0" step="0.5" min="0" class="config-input"></div>
                 <div><label for="propThickness" class="block config-label mb-1">Schriftdicke:</label><input type="number" id="propThickness" value="0.0" step="0.1" min="0" class="config-input"></div>
             </div>
+            <div class="mt-2">
+                <label for="propRotation" class="block config-label mb-1">Rotation (°): <span id="rotationValue">0</span></label>
+                <input type="range" id="propRotation" min="0" max="360" value="0" class="w-full">
+            </div>
         </template>
         <template id="fractalPropertiesTemplate">
             <h2>Eigenschaften: Muster</h2>
@@ -114,6 +118,10 @@
                 <div data-fractal="sierpinski_triangle" style="display:none;"><label class="block config-label mb-1">Iterationen:</label><input type="number" id="propSierpinskiIterations" value="4" min="1" max="7" step="1" class="config-input"></div>
                 <div data-fractal="hilbert_curve" style="display:none;"><label class="block config-label mb-1">Ordnung:</label><input type="number" id="propHilbertIterations" value="3" min="1" max="6" step="1" class="config-input"></div>
                 <div data-fractal="archimedean_spiral" style="display:none;"><label class="block config-label mb-1">Windungen:</label><input type="number" id="propSpiralTurns" value="5" min="1" step="1" class="config-input"><label class="block config-label mt-2 mb-1">Abstand:</label><input type="number" id="propSpiralSpacing" value="5" min="0.1" step="0.5" class="config-input"></div>
+            </div>
+            <div class="mt-2">
+                <label for="propRotation" class="block config-label mb-1">Rotation (°): <span id="rotationValue">0</span></label>
+                <input type="range" id="propRotation" min="0" max="360" value="0" class="w-full">
             </div>
         </template>
         <template id="imagePropertiesTemplate">
@@ -137,6 +145,10 @@
             <div class="mt-2">
                 <label for="propImageHatchDensity" class="block config-label mb-1">Liniendichte: <span id="densityValue">5</span></label>
                 <input type="range" id="propImageHatchDensity" min="1" max="20" value="5" class="w-full">
+            </div>
+            <div class="mt-2">
+                <label for="propRotation" class="block config-label mb-1">Rotation (°): <span id="rotationValue">0</span></label>
+                <input type="range" id="propRotation" min="0" max="360" value="0" class="w-full">
             </div>
         </template>
     </div>
@@ -296,14 +308,14 @@
 
             switch (type) {
                 case 'text':
-                    newObjectData = { id: newId, type, content: 'NEUER TEXT', position: defaultPosition, properties: { scale: 1.0, charSpacing: 2.0, lineSpacing: 5.0, thickness: 0.0 } };
+                    newObjectData = { id: newId, type, content: 'NEUER TEXT', position: defaultPosition, properties: { scale: 1.0, charSpacing: 2.0, lineSpacing: 5.0, thickness: 0.0, rotation: 0 } };
                     break;
                 case 'fractal':
-                    newObjectData = { id: newId, type, position: defaultPosition, properties: { fractalType: 'koch_snowflake', size: 100, iterations: 3, turns: 5, spacing: 5 } };
+                    newObjectData = { id: newId, type, position: defaultPosition, properties: { fractalType: 'koch_snowflake', size: 100, iterations: 3, turns: 5, spacing: 5, rotation: 0 } };
                     break;
                 case 'image':
                     if (!data.imageData) return;
-                    const imgProps = { size: 100, threshold: 128, hatchStyle: 'horizontal', hatchDensity: 5 };
+                    const imgProps = { size: 100, threshold: 128, hatchStyle: 'horizontal', hatchDensity: 5, rotation: 0 };
                     newObjectData = { id: newId, type, position: defaultPosition, properties: imgProps, originalImageData: data.imageData, tracedLines: traceImage(data.imageData, imgProps.threshold, imgProps.hatchStyle, imgProps.hatchDensity) };
                     break;
                 default: return;
@@ -468,6 +480,7 @@
                 line.position.sub(center);
                 
                 group.position.set(objData.position.x, objData.position.y, 0.1);
+                group.rotation.z = THREE.MathUtils.degToRad(objData.properties.rotation || 0);
                 group.userData.id = objData.id;
                 
                 scene.add(group);
@@ -578,6 +591,19 @@
                 document.getElementById('propSpiralSpacing').oninput = e => {obj.properties.spacing = parseFloat(e.target.value); renderAllObjects();};
                 
                 showCorrectParams();
+            }
+
+            const rotationSlider = document.getElementById('propRotation');
+            if (rotationSlider) {
+                const rotationValue = document.getElementById('rotationValue');
+                rotationSlider.value = selectedObject.data.properties.rotation || 0;
+                rotationValue.textContent = rotationSlider.value;
+                rotationSlider.oninput = e => {
+                    const newRotation = parseInt(e.target.value);
+                    selectedObject.data.properties.rotation = newRotation;
+                    rotationValue.textContent = newRotation;
+                    renderAllObjects();
+                };
             }
         }
         
@@ -697,20 +723,21 @@
             const simGroup = scene.getObjectByName('simulationGroup');
             const simulationLine = simGroup.getObjectByName('simulationLine');
             const simulationPen = simGroup.getObjectByName('simulationPen');
+            const xOffset = -20; // Visual offset for simulation only
             const yOffset = -60; // Visual offset for simulation only
 
             const pointsToDraw = [];
             for (let i = 0; i < index; i++) {
                 const seg = simulationSegments[i];
                 if (seg.isDrawing) {
-                    pointsToDraw.push(new THREE.Vector3(seg.p1.x, seg.p1.y + yOffset, 0.2), new THREE.Vector3(seg.p2.x, seg.p2.y + yOffset, 0.2));
+                    pointsToDraw.push(new THREE.Vector3(seg.p1.x + xOffset, seg.p1.y + yOffset, 0.2), new THREE.Vector3(seg.p2.x + xOffset, seg.p2.y + yOffset, 0.2));
                 }
             }
             simulationLine.geometry.setFromPoints(pointsToDraw);
 
             const currentPoint = (index > 0) ? simulationSegments[index - 1].p2 : {x:0, y:0};
             const isDrawing = (index > 0) ? simulationSegments[index - 1].isDrawing : false;
-            simulationPen.position.set(currentPoint.x, currentPoint.y + yOffset, 5);
+            simulationPen.position.set(currentPoint.x + xOffset, currentPoint.y + yOffset, 5);
             simulationPen.material.color.set(isDrawing ? 0x00cc00 : 0xcc0000);
         }
 
@@ -722,9 +749,9 @@
             segments.forEach(seg => {
                 gcode.push(
                     `G0 Z${travelZ.toFixed(2)} F${zSpeed}`,
-                    `G0 X${seg.p1.x.toFixed(2)} Y${(seg.p1.y + 20).toFixed(2)} F${travelSpeed}`,
+            `G0 X${(seg.p1.x + 20).toFixed(2)} Y${(seg.p1.y + 20).toFixed(2)} F${travelSpeed}`,
                     `G1 Z${writingZ.toFixed(2)} F${zSpeed}`,
-                    `G1 X${seg.p2.x.toFixed(2)} Y${(seg.p2.y + 20).toFixed(2)} F${writeSpeed}`
+            `G1 X${(seg.p2.x + 20).toFixed(2)} Y${(seg.p2.y + 20).toFixed(2)} F${writeSpeed}`
                 );
             });
             return gcode;
@@ -732,72 +759,89 @@
 
         function generateTextLineSegments(objData, useWorldCoordinates) {
             const { content, position, properties } = objData;
-            const { scale, charSpacing, lineSpacing, thickness } = properties;
-            const allSegments = [];
+            const { scale, charSpacing, lineSpacing, thickness, rotation } = properties;
 
-            let startX = 0, startY = 0;
-            if (useWorldCoordinates) {
-                let textWidth = 0, lineCount = 1, maxWidth = 0;
-                for (const c of content.toUpperCase()) {
-                    if (c === '\n') {
-                        lineCount++;
-                        maxWidth = Math.max(maxWidth, textWidth);
-                        textWidth = 0;
-                    } else { textWidth += BASE_CHAR_WIDTH * scale + charSpacing; }
-                }
-                maxWidth = Math.max(maxWidth, textWidth);
-                const totalHeight = (lineCount * BASE_CHAR_HEIGHT * scale) + Math.max(0, lineCount - 1) * lineSpacing;
-                startX = position.x - maxWidth / 2;
-                startY = position.y + totalHeight / 2;
-            }
+            let localSegments = [];
+            let currentX = 0, currentY = 0, textWidth = 0;
+            let lines = content.toUpperCase().split('\n');
+            const lineHeights = lines.map(line => BASE_CHAR_HEIGHT * scale);
+            const totalHeight = lineHeights.reduce((a,b) => a+b, 0) + Math.max(0, lines.length - 1) * lineSpacing;
+            const lineWidths = lines.map(line => line.split('').reduce((w, char) => w + (charPaths[char] ? BASE_CHAR_WIDTH * scale + charSpacing : 0), 0));
+            const maxWidth = Math.max(...lineWidths);
+            const centerOffsetX = -maxWidth / 2;
+            const centerOffsetY = totalHeight / 2;
+            currentY = centerOffsetY;
 
-            let currentX = startX;
-            let currentY = startY - (useWorldCoordinates ? BASE_CHAR_HEIGHT * scale : 0);
-
-            for (const char of content.toUpperCase()) {
-                if (char === '\n') {
-                    currentY -= (BASE_CHAR_HEIGHT * scale + lineSpacing);
-                    currentX = startX;
-                    continue;
-                }
-                if (charPaths[char]) {
-                    charPaths[char].forEach(stroke => {
-                        for (let i = 0; i < stroke.length - 1; i++) {
-                            const p1 = { x: currentX + stroke[i].x * scale, y: currentY + stroke[i].y * scale };
-                            const p2 = { x: currentX + stroke[i+1].x * scale, y: currentY + stroke[i+1].y * scale };
-                            allSegments.push({ p1, p2 });
-
-                            if (thickness > 0.01) {
-                                const dx = p2.x - p1.x;
-                                const dy = p2.y - p1.y;
-                                const len = Math.sqrt(dx * dx + dy * dy);
-                                if (len > 0) {
-                                    const perp_vec = { x: -dy / len, y: dx / len };
-                                    const p1_offset = { x: p1.x + perp_vec.x * thickness, y: p1.y + perp_vec.y * thickness };
-                                    const p2_offset = { x: p2.x + perp_vec.x * thickness, y: p2.y + perp_vec.y * thickness };
-                                    allSegments.push({ p1: p1_offset, p2: p2_offset });
+            lines.forEach((line, lineIndex) => {
+                currentX = centerOffsetX + (maxWidth - lineWidths[lineIndex]) / 2;
+                currentY -= lineHeights[lineIndex];
+                for (const char of line) {
+                    if (charPaths[char]) {
+                        charPaths[char].forEach(stroke => {
+                            for (let i = 0; i < stroke.length - 1; i++) {
+                                const p1 = { x: currentX + stroke[i].x * scale, y: currentY + stroke[i].y * scale };
+                                const p2 = { x: currentX + stroke[i+1].x * scale, y: currentY + stroke[i+1].y * scale };
+                                localSegments.push({ p1, p2 });
+                                if (thickness > 0.01) {
+                                    const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.sqrt(dx * dx + dy * dy);
+                                    if (len > 0) {
+                                        const perp = { x: -dy / len, y: dx / len };
+                                        const fillDensity = 0.4; // Draw a line every 0.4mm
+                                        const lineCount = Math.floor(thickness / fillDensity);
+                                        for (let j = 1; j <= lineCount; j++) {
+                                            const currentThickness = j * fillDensity;
+                                            const p1_offset = { x: p1.x + perp.x * currentThickness, y: p1.y + perp.y * currentThickness };
+                                            const p2_offset = { x: p2.x + perp.x * currentThickness, y: p2.y + perp.y * currentThickness };
+                                            localSegments.push({ p1: p1_offset, p2: p2_offset });
+                                        }
+                                    }
                                 }
                             }
-                        }
-                    });
+                        });
+                    }
+                    currentX += BASE_CHAR_WIDTH * scale + charSpacing;
                 }
-                currentX += BASE_CHAR_WIDTH * scale + charSpacing;
-            }
-            return allSegments;
+                currentY -= lineSpacing;
+            });
+
+            const angleRad = THREE.MathUtils.degToRad(rotation || 0);
+            const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
+            const finalPos = useWorldCoordinates ? position : {x: 0, y: 0};
+
+            return localSegments.map(seg => {
+                const p1_rot = { x: seg.p1.x * cosA - seg.p1.y * sinA, y: seg.p1.x * sinA + seg.p1.y * cosA };
+                const p2_rot = { x: seg.p2.x * cosA - seg.p2.y * sinA, y: seg.p2.x * sinA + seg.p2.y * cosA };
+                return {
+                    p1: { x: p1_rot.x + finalPos.x, y: p1_rot.y + finalPos.y },
+                    p2: { x: p2_rot.x + finalPos.x, y: p2_rot.y + finalPos.y }
+                };
+            });
         }
 
         function generateImageGcode(obj, config) {
             let gcode = [];
             const { position, properties, tracedLines, originalImageData } = obj;
             const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
-            const scale = properties.size / originalImageData.width;
-            const totalHeight = originalImageData.height * scale;
-            const startX = position.x - properties.size / 2;
-            const startY = position.y + totalHeight / 2;
+            const { size, rotation } = properties;
+
+            const scale = size / originalImageData.width;
+            const centerOffsetX = -size / 2;
+            const centerOffsetY = (originalImageData.height * scale) / 2;
+
+            const angleRad = THREE.MathUtils.degToRad(rotation || 0);
+            const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
+
             tracedLines.forEach(line => {
-                const p1x = startX + line.x1 * scale, p1y = startY - line.y1 * scale;
-                const p2x = startX + line.x2 * scale, p2y = startY - line.y2 * scale;
-                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${p1x.toFixed(2)} Y${(p1y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${p2x.toFixed(2)} Y${(p2y + 20).toFixed(2)} F${writeSpeed}`);
+                let p1_local = { x: line.x1 * scale + centerOffsetX, y: -line.y1 * scale + centerOffsetY };
+                let p2_local = { x: line.x2 * scale + centerOffsetX, y: -line.y2 * scale + centerOffsetY };
+
+                const p1_rot = { x: p1_local.x * cosA - p1_local.y * sinA, y: p1_local.x * sinA + p1_local.y * cosA };
+                const p2_rot = { x: p2_local.x * cosA - p2_local.y * sinA, y: p2_local.x * sinA + p2_local.y * cosA };
+
+                const p1_final = { x: p1_rot.x + position.x, y: p1_rot.y + position.y };
+                const p2_final = { x: p2_rot.x + position.x, y: p2_rot.y + position.y };
+
+                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${(p1_final.x + 20).toFixed(2)} Y${(p1_final.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${(p2_final.x + 20).toFixed(2)} Y${(p2_final.y + 20).toFixed(2)} F${writeSpeed}`);
             });
             return gcode;
         }
@@ -806,25 +850,30 @@
             let gcode = [];
             const { position, properties } = obj;
             const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
+            const { rotation } = properties;
+
             const pathInfo = getFractalPath(properties);
             if (!pathInfo || pathInfo.data.length === 0) return ["; FEHLER"];
-            const xs = pathInfo.data.flatMap(p => pathInfo.isLineSegments ? [p.p1.x, p.p2.x] : [p.x]);
-            const ys = pathInfo.data.flatMap(p => pathInfo.isLineSegments ? [p.p1.y, p.p2.y] : [p.y]);
-            const minX = Math.min(...xs), minY = Math.min(...ys), maxX = Math.max(...xs), maxY = Math.max(...ys);
-            const translateX = position.x - (minX + (maxX - minX) / 2);
-            const translateY = position.y - (minY + (maxY - minY) / 2);
-            const transform = p => ({ x: p.x + translateX, y: p.y + translateY });
+
+            const angleRad = THREE.MathUtils.degToRad(rotation || 0);
+            const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
+
+            const transform = p => {
+                const p_rot = { x: p.x * cosA - p.y * sinA, y: p.x * sinA + p.y * cosA };
+                return { x: p_rot.x + position.x, y: p_rot.y + position.y };
+            };
+
             if (pathInfo.isLineSegments) {
                 pathInfo.data.forEach(line => {
                     const s = transform(line.p1), e = transform(line.p2);
-                    gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${s.x.toFixed(2)} Y${(s.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${e.x.toFixed(2)} Y${(e.y + 20).toFixed(2)} F${writeSpeed}`);
+                    gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${(s.x + 20).toFixed(2)} Y${(s.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${(e.x + 20).toFixed(2)} Y${(e.y + 20).toFixed(2)} F${writeSpeed}`);
                 });
             } else {
                 const start = transform(pathInfo.data[0]);
-                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${start.x.toFixed(2)} Y${(start.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
+                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${(start.x + 20).toFixed(2)} Y${(start.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
                 for (let i=1; i<pathInfo.data.length; i++) {
                     const p = transform(pathInfo.data[i]);
-                    gcode.push(`G1 X${p.x.toFixed(2)} Y${(p.y + 20).toFixed(2)} F${writeSpeed}`);
+                    gcode.push(`G1 X${(p.x + 20).toFixed(2)} Y${(p.y + 20).toFixed(2)} F${writeSpeed}`);
                 }
             }
             return gcode;
