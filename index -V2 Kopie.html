@@ -72,6 +72,10 @@
                  <button id="downloadButton" class="w-full mt-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-md shadow-md hover:bg-green-700 transition">
                      G-Code herunterladen
                  </button>
+                 <div id="simulationControls" class="mt-4" style="display: none;">
+                    <label for="simulationSlider" class="block config-label mb-1">Simulations-Fortschritt:</label>
+                    <input type="range" id="simulationSlider" min="0" value="0" class="w-full">
+                </div>
             </div>
         </div>
     </div>
@@ -87,6 +91,7 @@
                 <div><label for="propScale" class="block config-label mb-1">Skalierung:</label><input type="number" id="propScale" value="1.0" step="0.1" min="0.1" class="config-input"></div>
                 <div><label for="propCharSpacing" class="block config-label mb-1">Zeichenabst.:</label><input type="number" id="propCharSpacing" value="2.0" step="0.5" min="0" class="config-input"></div>
                 <div><label for="propLineSpacing" class="block config-label mb-1">Zeilenabst.:</label><input type="number" id="propLineSpacing" value="5.0" step="0.5" min="0" class="config-input"></div>
+                <div><label for="propThickness" class="block config-label mb-1">Schriftdicke:</label><input type="number" id="propThickness" value="0.0" step="0.1" min="0" class="config-input"></div>
             </div>
         </template>
         <template id="fractalPropertiesTemplate">
@@ -120,6 +125,18 @@
             <div class="mt-2">
                 <label for="propImageThreshold" class="block config-label mb-1">Schärfe (Schwelle): <span id="thresholdValue">128</span></label>
                 <input type="range" id="propImageThreshold" min="1" max="254" value="128" class="w-full">
+            </div>
+             <div class="mt-2">
+                <label for="propImageHatchStyle" class="block config-label mb-1">Schraffur-Typ:</label>
+                <select id="propImageHatchStyle" class="config-input">
+                    <option value="horizontal">Horizontal</option>
+                    <option value="vertical">Vertikal</option>
+                    <option value="cross">Gekreuzt</option>
+                </select>
+            </div>
+            <div class="mt-2">
+                <label for="propImageHatchDensity" class="block config-label mb-1">Liniendichte: <span id="densityValue">5</span></label>
+                <input type="range" id="propImageHatchDensity" min="1" max="20" value="5" class="w-full">
             </div>
         </template>
     </div>
@@ -269,14 +286,15 @@
 
             switch (type) {
                 case 'text':
-                    newObjectData = { id: newId, type, content: 'NEUER TEXT', position: defaultPosition, properties: { scale: 1.0, charSpacing: 2.0, lineSpacing: 5.0 } };
+                    newObjectData = { id: newId, type, content: 'NEUER TEXT', position: defaultPosition, properties: { scale: 1.0, charSpacing: 2.0, lineSpacing: 5.0, thickness: 0.0 } };
                     break;
                 case 'fractal':
                     newObjectData = { id: newId, type, position: defaultPosition, properties: { fractalType: 'koch_snowflake', size: 100, iterations: 3, turns: 5, spacing: 5 } };
                     break;
                 case 'image':
                     if (!data.imageData) return;
-                    newObjectData = { id: newId, type, position: defaultPosition, properties: { size: 100, threshold: 128 }, originalImageData: data.imageData, tracedLines: traceImage(data.imageData, 128) };
+                    const imgProps = { size: 100, threshold: 128, hatchStyle: 'horizontal', hatchDensity: 5 };
+                    newObjectData = { id: newId, type, position: defaultPosition, properties: imgProps, originalImageData: data.imageData, tracedLines: traceImage(data.imageData, imgProps.threshold, imgProps.hatchStyle, imgProps.hatchDensity) };
                     break;
                 default: return;
             }
@@ -340,29 +358,71 @@
             event.target.value = '';
         }
 
-        function traceImage(imageData, threshold) {
+        function traceImage(imageData, threshold, hatchStyle = 'horizontal', hatchDensity = 1) {
             const lines = [];
             const { data, width, height } = imageData;
-            for (let y = 0; y < height; y++) {
-                let inLine = false;
-                let startX = 0;
-                for (let x = 0; x < width; x++) {
-                    const i = (y * width + x) * 4;
-                    const brightness = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-                    if (!inLine && brightness < threshold) {
-                        inLine = true;
-                        startX = x;
-                    } else if (inLine && (brightness >= threshold || x === width - 1)) {
-                        inLine = false;
-                        lines.push({ x1: startX, y1: y, x2: x, y2: y });
+            hatchDensity = Math.max(1, hatchDensity);
+
+            const traceHorizontal = () => {
+                for (let y = 0; y < height; y += hatchDensity) {
+                    let inLine = false;
+                    let startX = 0;
+                    for (let x = 0; x < width; x++) {
+                        const i = (Math.floor(y) * width + x) * 4;
+                        const brightness = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                        if (!inLine && brightness < threshold) {
+                            inLine = true;
+                            startX = x;
+                        } else if (inLine && (brightness >= threshold || x === width - 1)) {
+                            inLine = false;
+                            lines.push({ x1: startX, y1: y, x2: x, y2: y });
+                        }
                     }
                 }
+            };
+
+            const traceVertical = () => {
+                for (let x = 0; x < width; x += hatchDensity) {
+                    let inLine = false;
+                    let startY = 0;
+                    for (let y = 0; y < height; y++) {
+                        const i = (y * width + Math.floor(x)) * 4;
+                        const brightness = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                        if (!inLine && brightness < threshold) {
+                            inLine = true;
+                            startY = y;
+                        } else if (inLine && (brightness >= threshold || y === height - 1)) {
+                            inLine = false;
+                            lines.push({ x1: x, y1: startY, x2: x, y2: y });
+                        }
+                    }
+                }
+            };
+
+            switch (hatchStyle) {
+                case 'horizontal':
+                    traceHorizontal();
+                    break;
+                case 'vertical':
+                    traceVertical();
+                    break;
+                case 'cross':
+                    traceHorizontal();
+                    traceVertical();
+                    break;
+                default:
+                    traceHorizontal();
             }
             return lines;
         }
 
         // --- Rendering & UI Updates ---
+        let simulationSegments = [];
         function renderAllObjects() {
+            const simGroup = scene.getObjectByName('simulationGroup');
+            if (simGroup) simGroup.visible = false;
+            document.getElementById('simulationControls').style.display = 'none';
+
             objectMeshes.forEach(mesh => {
                 scene.remove(mesh);
                 mesh.children.forEach(child => {
@@ -446,10 +506,13 @@
             if (obj.type === 'text') {
                 document.getElementById('propInputText').value = obj.content;
                 document.getElementById('propInputText').oninput = e => { obj.content = e.target.value.toUpperCase(); renderAllObjects(); updateObjectList(); };
-                ['scale', 'charSpacing', 'lineSpacing'].forEach(p => {
-                    const el = document.getElementById(`prop${p.charAt(0).toUpperCase() + p.slice(1)}`);
-                    el.value = obj.properties[p];
-                    el.oninput = e => { obj.properties[p] = parseFloat(e.target.value); renderAllObjects(); };
+                ['scale', 'charSpacing', 'lineSpacing', 'thickness'].forEach(p => {
+                    const propName = p.charAt(0).toUpperCase() + p.slice(1);
+                    const el = document.getElementById(`prop${propName}`);
+                    if (el) {
+                        el.value = obj.properties[p];
+                        el.oninput = e => { obj.properties[p] = parseFloat(e.target.value); renderAllObjects(); };
+                    }
                 });
             } else if (obj.type === 'image') {
                 document.getElementById('propImageSize').value = obj.properties.size;
@@ -462,7 +525,26 @@
                     const newThreshold = parseInt(e.target.value);
                     obj.properties.threshold = newThreshold;
                     thresholdValue.textContent = newThreshold;
-                    obj.tracedLines = traceImage(obj.originalImageData, newThreshold);
+                    obj.tracedLines = traceImage(obj.originalImageData, newThreshold, obj.properties.hatchStyle, obj.properties.hatchDensity);
+                    renderAllObjects();
+                };
+
+                document.getElementById('propImageHatchStyle').value = obj.properties.hatchStyle;
+                document.getElementById('propImageHatchStyle').onchange = e => {
+                    obj.properties.hatchStyle = e.target.value;
+                    obj.tracedLines = traceImage(obj.originalImageData, obj.properties.threshold, obj.properties.hatchStyle, obj.properties.hatchDensity);
+                    renderAllObjects();
+                };
+
+                const densitySlider = document.getElementById('propImageHatchDensity');
+                const densityValue = document.getElementById('densityValue');
+                densitySlider.value = obj.properties.hatchDensity;
+                densityValue.textContent = obj.properties.hatchDensity;
+                densitySlider.oninput = e => {
+                    const newDensity = parseInt(e.target.value);
+                    obj.properties.hatchDensity = newDensity;
+                    densityValue.textContent = newDensity;
+                    obj.tracedLines = traceImage(obj.originalImageData, obj.properties.threshold, obj.properties.hatchStyle, newDensity);
                     renderAllObjects();
                 };
             } else if (obj.type === 'fractal') {
@@ -496,19 +578,10 @@
             const { type, properties } = objData;
 
             if(type === 'text') {
-                const { content, scale, charSpacing, lineSpacing } = { ...objData, ...properties};
-                let currentX = 0, currentY = 0;
-                for (const char of content.toUpperCase()) {
-                     if (char === '\n') { currentY -= (BASE_CHAR_HEIGHT*scale + lineSpacing); currentX = 0; continue; }
-                    if (charPaths[char]) {
-                        charPaths[char].forEach(stroke => {
-                            for (let i = 0; i < stroke.length - 1; i++) {
-                                allPoints.push(new THREE.Vector3(currentX+stroke[i].x*scale, currentY+stroke[i].y*scale, 0), new THREE.Vector3(currentX+stroke[i+1].x*scale, currentY+stroke[i+1].y*scale, 0));
-                            }
-                        });
-                    }
-                    currentX += BASE_CHAR_WIDTH*scale + charSpacing;
-                }
+                const segments = generateTextLineSegments(objData, false); // false = local coordinates
+                segments.forEach(seg => {
+                    allPoints.push(new THREE.Vector3(seg.p1.x, seg.p1.y, 0), new THREE.Vector3(seg.p2.x, seg.p2.y, 0));
+                });
             } else if (type === 'image') {
                 const { tracedLines, size } = { ...objData, ...properties};
                 const scale = size / objData.originalImageData.width;
@@ -529,7 +602,7 @@
         function getFractalPath(props) { /* ... Fractal generation logic ... */ return {data: [], isLineSegments: false}; }
 
 
-        // --- G-Code Generierung ---
+        // --- G-Code Generierung & Simulation ---
         function generateFinalGCode() {
             const config = {
                 writingZ: parseFloat(document.getElementById('writingZ').value), travelZ: parseFloat(document.getElementById('travelZ').value),
@@ -548,9 +621,160 @@
             
             gcodeOutput.textContent = gcode.join('\n');
             gcodeContainer.classList.remove('hidden');
+            setupSimulation(gcode);
         }
 
-        function generateTextGcode(obj, config) { /* ... G-code logic for text ... */ return []; }
+        function setupSimulation(gcode) {
+            simulationSegments = [];
+            let lastPos = { x: 0, y: 0, z: parseFloat(document.getElementById('travelZ').value) };
+            const writingZ = parseFloat(document.getElementById('writingZ').value);
+
+            gcode.forEach(line => {
+                if (line.startsWith(';') || line.trim() === '') return;
+
+                let newPos = { ...lastPos };
+                const gMatch = line.match(/G([01])/i);
+                if (!gMatch) return;
+
+                const xMatch = line.match(/X([\d\.-]+)/i);
+                const yMatch = line.match(/Y([\d\.-]+)/i);
+                const zMatch = line.match(/Z([\d\.-]+)/i);
+
+                if (xMatch) newPos.x = parseFloat(xMatch[1]);
+                if (yMatch) newPos.y = parseFloat(yMatch[1]);
+                if (zMatch) newPos.z = parseFloat(zMatch[1]);
+
+                if (xMatch || yMatch) {
+                    simulationSegments.push({
+                        p1: { x: lastPos.x, y: lastPos.y },
+                        p2: { x: newPos.x, y: newPos.y },
+                        isDrawing: lastPos.z <= writingZ + 0.1
+                    });
+                }
+                lastPos = newPos;
+            });
+
+            if (simulationSegments.length === 0) return;
+
+            const slider = document.getElementById('simulationSlider');
+            slider.max = simulationSegments.length;
+            slider.value = 0;
+            document.getElementById('simulationControls').style.display = 'block';
+
+            let simGroup = scene.getObjectByName('simulationGroup');
+            if (!simGroup) {
+                simGroup = new THREE.Group();
+                simGroup.name = 'simulationGroup';
+                const simLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 3 }));
+                simLine.name = 'simulationLine';
+                simGroup.add(simLine);
+                const penGeom = new THREE.ConeGeometry(2.5, 10, 8);
+                penGeom.translate(0, 5, 0);
+                penGeom.rotateX(Math.PI / 2);
+                const simPen = new THREE.Mesh(penGeom, new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+                simPen.name = 'simulationPen';
+                simGroup.add(simPen);
+                scene.add(simGroup);
+            }
+            simGroup.visible = true;
+            objectMeshes.forEach(m => m.visible = false);
+
+            slider.oninput = (e) => updateSimulation(parseInt(e.target.value));
+            updateSimulation(0);
+        }
+
+        function updateSimulation(index) {
+            const simGroup = scene.getObjectByName('simulationGroup');
+            const simulationLine = simGroup.getObjectByName('simulationLine');
+            const simulationPen = simGroup.getObjectByName('simulationPen');
+
+            const pointsToDraw = [];
+            for (let i = 0; i < index; i++) {
+                const seg = simulationSegments[i];
+                if (seg.isDrawing) {
+                    pointsToDraw.push(new THREE.Vector3(seg.p1.x, seg.p1.y, 0.2), new THREE.Vector3(seg.p2.x, seg.p2.y, 0.2));
+                }
+            }
+            simulationLine.geometry.setFromPoints(pointsToDraw);
+
+            const currentPoint = (index > 0) ? simulationSegments[index - 1].p2 : {x:0, y:0};
+            const isDrawing = (index > 0) ? simulationSegments[index - 1].isDrawing : false;
+            simulationPen.position.set(currentPoint.x, currentPoint.y, 5);
+            simulationPen.material.color.set(isDrawing ? 0x00cc00 : 0xcc0000);
+        }
+
+        function generateTextGcode(obj, config) {
+            let gcode = [];
+            const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
+            const segments = generateTextLineSegments(obj, true); // true = world coordinates
+
+            segments.forEach(seg => {
+                gcode.push(
+                    `G0 Z${travelZ.toFixed(2)} F${zSpeed}`,
+                    `G0 X${seg.p1.x.toFixed(2)} Y${seg.p1.y.toFixed(2)} F${travelSpeed}`,
+                    `G1 Z${writingZ.toFixed(2)} F${zSpeed}`,
+                    `G1 X${seg.p2.x.toFixed(2)} Y${seg.p2.y.toFixed(2)} F${writeSpeed}`
+                );
+            });
+            return gcode;
+        }
+
+        function generateTextLineSegments(objData, useWorldCoordinates) {
+            const { content, position, properties } = objData;
+            const { scale, charSpacing, lineSpacing, thickness } = properties;
+            const allSegments = [];
+
+            let startX = 0, startY = 0;
+            if (useWorldCoordinates) {
+                let textWidth = 0, lineCount = 1, maxWidth = 0;
+                for (const c of content.toUpperCase()) {
+                    if (c === '\n') {
+                        lineCount++;
+                        maxWidth = Math.max(maxWidth, textWidth);
+                        textWidth = 0;
+                    } else { textWidth += BASE_CHAR_WIDTH * scale + charSpacing; }
+                }
+                maxWidth = Math.max(maxWidth, textWidth);
+                const totalHeight = (lineCount * BASE_CHAR_HEIGHT * scale) + Math.max(0, lineCount - 1) * lineSpacing;
+                startX = position.x - maxWidth / 2;
+                startY = position.y + totalHeight / 2 + 40;
+            }
+
+            let currentX = startX;
+            let currentY = startY - (useWorldCoordinates ? BASE_CHAR_HEIGHT * scale : 0);
+
+            for (const char of content.toUpperCase()) {
+                if (char === '\n') {
+                    currentY -= (BASE_CHAR_HEIGHT * scale + lineSpacing);
+                    currentX = startX;
+                    continue;
+                }
+                if (charPaths[char]) {
+                    charPaths[char].forEach(stroke => {
+                        for (let i = 0; i < stroke.length - 1; i++) {
+                            const p1 = { x: currentX + stroke[i].x * scale, y: currentY + stroke[i].y * scale };
+                            const p2 = { x: currentX + stroke[i+1].x * scale, y: currentY + stroke[i+1].y * scale };
+                            allSegments.push({ p1, p2 });
+
+                            if (thickness > 0.01) {
+                                const dx = p2.x - p1.x;
+                                const dy = p2.y - p1.y;
+                                const len = Math.sqrt(dx * dx + dy * dy);
+                                if (len > 0) {
+                                    const perp_vec = { x: -dy / len, y: dx / len };
+                                    const p1_offset = { x: p1.x + perp_vec.x * thickness, y: p1.y + perp_vec.y * thickness };
+                                    const p2_offset = { x: p2.x + perp_vec.x * thickness, y: p2.y + perp_vec.y * thickness };
+                                    allSegments.push({ p1: p1_offset, p2: p2_offset });
+                                }
+                            }
+                        }
+                    });
+                }
+                currentX += BASE_CHAR_WIDTH * scale + charSpacing;
+            }
+            return allSegments;
+        }
+
         function generateImageGcode(obj, config) { /* ... G-code logic for images ... */ return []; }
         function generateFractalGcode(obj, config) { /* ... G-code logic for fractals ... */ return []; }
 
