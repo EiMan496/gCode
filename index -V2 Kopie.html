@@ -528,34 +528,37 @@
             const obj = selectedObject.data;
             if (obj.type === 'text') {
                 document.getElementById('propInputText').value = obj.content;
-                document.getElementById('propInputText').oninput = e => { obj.content = e.target.value.toUpperCase(); renderAllObjects(); updateObjectList(); };
+                document.getElementById('propInputText').oninput = e => { selectedObject.data.content = e.target.value.toUpperCase(); renderAllObjects(); updateObjectList(); };
                 ['scale', 'charSpacing', 'lineSpacing', 'thickness'].forEach(p => {
                     const propName = p.charAt(0).toUpperCase() + p.slice(1);
                     const el = document.getElementById(`prop${propName}`);
                     if (el) {
                         el.value = obj.properties[p];
-                        el.oninput = e => { obj.properties[p] = parseFloat(e.target.value); renderAllObjects(); };
+                        el.oninput = e => {
+                            selectedObject.data.properties[p] = parseFloat(e.target.value);
+                            renderAllObjects();
+                        };
                     }
                 });
             } else if (obj.type === 'image') {
                 document.getElementById('propImageSize').value = obj.properties.size;
-                document.getElementById('propImageSize').oninput = e => { obj.properties.size = parseFloat(e.target.value); renderAllObjects(); };
+                document.getElementById('propImageSize').oninput = e => { selectedObject.data.properties.size = parseFloat(e.target.value); renderAllObjects(); };
                 const thresholdSlider = document.getElementById('propImageThreshold');
                 const thresholdValue = document.getElementById('thresholdValue');
                 thresholdSlider.value = obj.properties.threshold;
                 thresholdValue.textContent = obj.properties.threshold;
                 thresholdSlider.oninput = e => {
                     const newThreshold = parseInt(e.target.value);
-                    obj.properties.threshold = newThreshold;
+                    selectedObject.data.properties.threshold = newThreshold;
                     thresholdValue.textContent = newThreshold;
-                    obj.tracedLines = traceImage(obj.originalImageData, newThreshold, obj.properties.hatchStyle, obj.properties.hatchDensity);
+                    selectedObject.data.tracedLines = traceImage(selectedObject.data.originalImageData, newThreshold, selectedObject.data.properties.hatchStyle, selectedObject.data.properties.hatchDensity);
                     renderAllObjects();
                 };
 
                 document.getElementById('propImageHatchStyle').value = obj.properties.hatchStyle;
                 document.getElementById('propImageHatchStyle').onchange = e => {
-                    obj.properties.hatchStyle = e.target.value;
-                    obj.tracedLines = traceImage(obj.originalImageData, obj.properties.threshold, obj.properties.hatchStyle, obj.properties.hatchDensity);
+                    selectedObject.data.properties.hatchStyle = e.target.value;
+                    selectedObject.data.tracedLines = traceImage(selectedObject.data.originalImageData, selectedObject.data.properties.threshold, selectedObject.data.properties.hatchStyle, selectedObject.data.properties.hatchDensity);
                     renderAllObjects();
                 };
 
@@ -565,9 +568,9 @@
                 densityValue.textContent = obj.properties.hatchDensity;
                 densitySlider.oninput = e => {
                     const newDensity = parseInt(e.target.value);
-                    obj.properties.hatchDensity = newDensity;
+                    selectedObject.data.properties.hatchDensity = newDensity;
                     densityValue.textContent = newDensity;
-                    obj.tracedLines = traceImage(obj.originalImageData, obj.properties.threshold, obj.properties.hatchStyle, newDensity);
+                    selectedObject.data.tracedLines = traceImage(selectedObject.data.originalImageData, selectedObject.data.properties.threshold, selectedObject.data.properties.hatchStyle, newDensity);
                     renderAllObjects();
                 };
             } else if (obj.type === 'fractal') {
@@ -581,14 +584,14 @@
                     if(selectedDiv) selectedDiv.style.display = 'block';
                 };
 
-                typeSelect.onchange = e => { obj.properties.fractalType = e.target.value; showCorrectParams(); renderAllObjects(); updateObjectList();};
+                typeSelect.onchange = e => { selectedObject.data.properties.fractalType = e.target.value; showCorrectParams(); renderAllObjects(); updateObjectList();};
                 
-                document.getElementById('propFractalSize').oninput = e => {obj.properties.size = parseFloat(e.target.value); renderAllObjects();};
-                document.getElementById('propKochIterations').oninput = e => {obj.properties.iterations = parseInt(e.target.value); renderAllObjects();};
-                document.getElementById('propSierpinskiIterations').oninput = e => {obj.properties.iterations = parseInt(e.target.value); renderAllObjects();};
-                document.getElementById('propHilbertIterations').oninput = e => {obj.properties.iterations = parseInt(e.target.value); renderAllObjects();};
-                document.getElementById('propSpiralTurns').oninput = e => {obj.properties.turns = parseInt(e.target.value); renderAllObjects();};
-                document.getElementById('propSpiralSpacing').oninput = e => {obj.properties.spacing = parseFloat(e.target.value); renderAllObjects();};
+                document.getElementById('propFractalSize').oninput = e => {selectedObject.data.properties.size = parseFloat(e.target.value); renderAllObjects();};
+                document.getElementById('propKochIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
+                document.getElementById('propSierpinskiIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
+                document.getElementById('propHilbertIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
+                document.getElementById('propSpiralTurns').oninput = e => {selectedObject.data.properties.turns = parseInt(e.target.value); renderAllObjects();};
+                document.getElementById('propSpiralSpacing').oninput = e => {selectedObject.data.properties.spacing = parseFloat(e.target.value); renderAllObjects();};
                 
                 showCorrectParams();
             }
