@@ -47,7 +47,7 @@
             </div>
              <p class="text-xs text-gray-500 mt-2 text-center"><b>Steuerung:</b> Mausrad = Zoom, Linksklick = Drehen, <br><b>Strg + Linksklick</b> auf Objekt = Verschieben</p>
         </div>
-        
+
         <div id="objectListPanel" class="control-panel" style="display: none;">
             <h2>2. Objektliste</h2>
             <ul id="objectList" class="space-y-1"></ul>
@@ -177,7 +177,7 @@
         const gcodeContainer = document.getElementById('gcodeContainer');
         const gcodeOutput = document.getElementById('gcodeOutput');
         const imageUpload = document.getElementById('imageUpload');
-        
+
         // --- Initialisierung ---
         function init() {
             const container = document.getElementById('canvasContainer');
@@ -225,7 +225,7 @@
 
             animate();
         }
-        
+
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
@@ -265,7 +265,7 @@
                 }
             }
         }
-        
+
         function onPointerMove(event) {
             if (isDragging && selectedObject) {
                 event.preventDefault();
@@ -299,7 +299,7 @@
             }
             return null;
         }
-        
+
         // --- Objekt-Management ---
         function addObject(type, data = {}) {
             const newId = Date.now();
@@ -345,15 +345,15 @@
         function selectObjectById(id) {
             const objData = sceneObjects.find(obj => obj.id === id);
             if (!objData) return;
-            
+
             const objMesh = objectMeshes.find(m => m.userData.id === id);
             if (!objMesh) return;
-            
+
             selectedObject = { data: objData, mesh: objMesh };
-            
+
             objectMeshes.forEach(m => m.children[1].material.color.set(0x00aaff));
             objMesh.children[1].material.color.set(0xffa500);
-            
+
             updatePropertiesPanel();
             updateObjectList();
         }
@@ -464,42 +464,42 @@
                 const box = geometry.boundingBox;
                 const size = new THREE.Vector3();
                 box.getSize(size);
-                
+
                 const boxColor = (selectedObject && selectedObject.data.id === objData.id) ? 0xffa500 : 0x00aaff;
                 const boxHelper = new THREE.Mesh(
                     new THREE.PlaneGeometry(Math.max(size.x, 1), Math.max(size.y, 1)),
                     new THREE.MeshBasicMaterial({ color: boxColor, transparent: true, opacity: 0.25, side: THREE.DoubleSide })
                 );
-                
+
                 const group = new THREE.Group();
                 group.add(line);
                 group.add(boxHelper);
-                
+
                 const center = new THREE.Vector3();
                 box.getCenter(center);
                 line.position.sub(center);
-                
+
                 group.position.set(objData.position.x, objData.position.y, 0.1);
                 group.rotation.z = THREE.MathUtils.degToRad(objData.properties.rotation || 0);
                 group.userData.id = objData.id;
-                
+
                 scene.add(group);
                 objectMeshes.push(group);
             });
         }
-        
+
         function updateObjectList() {
             objectList.innerHTML = '';
             sceneObjects.forEach(obj => {
                 const li = document.createElement('li');
                 li.dataset.id = obj.id;
                 if(selectedObject && selectedObject.data.id === obj.id) li.classList.add('selected');
-                
+
                 let name = obj.type.charAt(0).toUpperCase() + obj.type.slice(1);
                 if(obj.type === 'text') name += `: "${obj.content.substring(0, 15)}..."`;
                 if(obj.type === 'fractal') name += `: ${obj.properties.fractalType.replace(/_/g, ' ')}`;
                 li.innerHTML = `<span>${name}</span><button class="delete-btn" data-id="${obj.id}">&#x2716;</button>`;
-                
+
                 li.querySelector('.delete-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
                     deleteObject(obj.id);
@@ -508,7 +508,7 @@
                 objectList.appendChild(li);
             });
         }
-        
+
         function updatePropertiesPanel() {
             if (!selectedObject) {
                 propertiesPanel.style.display = 'none';
@@ -524,7 +524,7 @@
             const template = document.getElementById(templateId);
             if (!template) return;
             propertiesPanel.appendChild(template.content.cloneNode(true));
-            
+
             const obj = selectedObject.data;
             if (obj.type === 'text') {
                 document.getElementById('propInputText').value = obj.content;
@@ -576,7 +576,7 @@
             } else if (obj.type === 'fractal') {
                 const typeSelect = document.getElementById('propFractalType');
                 typeSelect.value = obj.properties.fractalType;
-                
+
                 const paramDivs = document.querySelectorAll('#fractalParamsContainer > div');
                 const showCorrectParams = () => {
                     paramDivs.forEach(div => div.style.display = 'none');
@@ -585,14 +585,14 @@
                 };
 
                 typeSelect.onchange = e => { selectedObject.data.properties.fractalType = e.target.value; showCorrectParams(); renderAllObjects(); updateObjectList();};
-                
+
                 document.getElementById('propFractalSize').oninput = e => {selectedObject.data.properties.size = parseFloat(e.target.value); renderAllObjects();};
                 document.getElementById('propKochIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propSierpinskiIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propHilbertIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propSpiralTurns').oninput = e => {selectedObject.data.properties.turns = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propSpiralSpacing').oninput = e => {selectedObject.data.properties.spacing = parseFloat(e.target.value); renderAllObjects();};
-                
+
                 showCorrectParams();
             }
 
@@ -609,7 +609,7 @@
                 };
             }
         }
-        
+
         // --- Punkt- und Pfadgenerierung für Vorschau ---
         const fractalGenerators = { /* ... Fractal math functions ... */ };
         function getObjectPoints(objData) {
@@ -648,16 +648,16 @@
                 writeSpeed: parseInt(document.getElementById('writeSpeed').value), travelSpeed: parseInt(document.getElementById('travelSpeed').value), zSpeed: 300
             };
             let gcode = ["; G-code generiert mit Interaktivem Plotter", "G21 ; Millimeter", "G90 ; Absolute Positionierung", "G28 ; Home All Axes", `G0 Z${config.travelZ.toFixed(2)} F${config.zSpeed}`];
-            
+
             sceneObjects.forEach(obj => {
                 gcode.push(`\n; Starte Objekt: ${obj.type} (ID: ${obj.id})`);
                 if (obj.type === 'text') gcode.push(...generateTextGcode(obj, config));
                 else if (obj.type === 'image') gcode.push(...generateImageGcode(obj, config));
                 else if (obj.type === 'fractal') gcode.push(...generateFractalGcode(obj, config));
             });
-            
+
             gcode.push(`\n; Plot beendet`, `G0 Z${(config.travelZ + 10).toFixed(2)} F${config.zSpeed}`, `G0 X0 Y10 F${travelSpeed}`, "M84 ; Motoren aus");
-            
+
             gcodeOutput.textContent = gcode.join('\n');
             gcodeContainer.classList.remove('hidden');
             setupSimulation(gcode);
@@ -897,9 +897,9 @@
              a.click();
              URL.revokeObjectURL(a.href);
         });
-        
+
         init();
-        
+
         // --- HILFSFUNKTIONEN (Fraktale & G-Code) ---
         // (Hier sind alle fehlenden Implementierungen)
         Object.assign(fractalGenerators, {
