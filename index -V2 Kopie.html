@@ -59,10 +59,10 @@
         <div class="control-panel">
             <h2>G-Code Generierung</h2>
             <div class="grid grid-cols-2 gap-4 mb-4">
-                <div><label class="block config-label mb-1">Schreibhöhe Z:</label><input type="number" id="writingZ" value="7.0" step="0.5" class="config-input"></div>
+                <div><label class="block config-label mb-1">Schreibhöhe Z:</label><input type="number" id="writingZ" value="7.5" step="0.5" class="config-input"></div>
                 <div><label class="block config-label mb-1">Fahrhöhe Z:</label><input type="number" id="travelZ" value="14.0" step="0.5" class="config-input"></div>
                 <div><label class="block config-label mb-1">Schreib-V:</label><input type="number" id="writeSpeed" value="5000" step="100" class="config-input"></div>
-                <div><label class="block config-label mb-1">Fahr-V:</label><input type="number" id="travelSpeed" value="9000" step="100" class="config-input"></div>
+                <div><label class="block config-label mb-1">Fahr-V:</label><input type="number" id="travelSpeed" value="45000" step="100" class="config-input"></div>
             </div>
             <button id="generateButton" class="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md shadow-md hover:bg-indigo-700 transition" disabled>
                 G-Code für alle Objekte generieren
@@ -171,16 +171,21 @@
             const container = document.getElementById('canvasContainer');
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x2d3748);
-            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 2000);
-            camera.position.set(PAPER_WIDTH / 2, BED_HEIGHT - PAPER_HEIGHT / 2, 550);
+
+            const aspect = container.clientWidth / container.clientHeight;
+            const frustumSize = BED_HEIGHT * 1.1; // Frustum larger than paper
+            camera = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, 0.1, 2000);
+            camera.position.set(BED_WIDTH / 2, BED_HEIGHT / 2, 500);
+
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
             container.appendChild(renderer.domElement);
             document.getElementById('loadingText').remove();
 
             controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.target.set(PAPER_WIDTH / 2, BED_HEIGHT - PAPER_HEIGHT / 2, 0);
+            controls.target.set(BED_WIDTH / 2, BED_HEIGHT / 2, 0);
             controls.enableDamping = true;
+            controls.enableRotate = false; // Disable rotation for 2D view
 
             scene.add(new THREE.AmbientLight(0xffffff, 0.8));
             const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
@@ -217,7 +222,12 @@
 
         function onWindowResize() {
             const container = document.getElementById('canvasContainer');
-            camera.aspect = container.clientWidth / container.clientHeight;
+            const aspect = container.clientWidth / container.clientHeight;
+            const frustumSize = BED_HEIGHT * 1.1;
+            camera.left = frustumSize * aspect / -2;
+            camera.right = frustumSize * aspect / 2;
+            camera.top = frustumSize / 2;
+            camera.bottom = frustumSize / -2;
             camera.updateProjectionMatrix();
             renderer.setSize(container.clientWidth, container.clientHeight);
         }
@@ -687,19 +697,20 @@
             const simGroup = scene.getObjectByName('simulationGroup');
             const simulationLine = simGroup.getObjectByName('simulationLine');
             const simulationPen = simGroup.getObjectByName('simulationPen');
+            const yOffset = -60; // Visual offset for simulation only
 
             const pointsToDraw = [];
             for (let i = 0; i < index; i++) {
                 const seg = simulationSegments[i];
                 if (seg.isDrawing) {
-                    pointsToDraw.push(new THREE.Vector3(seg.p1.x, seg.p1.y, 0.2), new THREE.Vector3(seg.p2.x, seg.p2.y, 0.2));
+                    pointsToDraw.push(new THREE.Vector3(seg.p1.x, seg.p1.y + yOffset, 0.2), new THREE.Vector3(seg.p2.x, seg.p2.y + yOffset, 0.2));
                 }
             }
             simulationLine.geometry.setFromPoints(pointsToDraw);
 
             const currentPoint = (index > 0) ? simulationSegments[index - 1].p2 : {x:0, y:0};
             const isDrawing = (index > 0) ? simulationSegments[index - 1].isDrawing : false;
-            simulationPen.position.set(currentPoint.x, currentPoint.y, 5);
+            simulationPen.position.set(currentPoint.x, currentPoint.y + yOffset, 5);
             simulationPen.material.color.set(isDrawing ? 0x00cc00 : 0xcc0000);
         }
 
@@ -711,9 +722,9 @@
             segments.forEach(seg => {
                 gcode.push(
                     `G0 Z${travelZ.toFixed(2)} F${zSpeed}`,
-                    `G0 X${seg.p1.x.toFixed(2)} Y${seg.p1.y.toFixed(2)} F${travelSpeed}`,
+                    `G0 X${seg.p1.x.toFixed(2)} Y${(seg.p1.y + 20).toFixed(2)} F${travelSpeed}`,
                     `G1 Z${writingZ.toFixed(2)} F${zSpeed}`,
-                    `G1 X${seg.p2.x.toFixed(2)} Y${seg.p2.y.toFixed(2)} F${writeSpeed}`
+                    `G1 X${seg.p2.x.toFixed(2)} Y${(seg.p2.y + 20).toFixed(2)} F${writeSpeed}`
                 );
             });
             return gcode;
@@ -737,7 +748,7 @@
                 maxWidth = Math.max(maxWidth, textWidth);
                 const totalHeight = (lineCount * BASE_CHAR_HEIGHT * scale) + Math.max(0, lineCount - 1) * lineSpacing;
                 startX = position.x - maxWidth / 2;
-                startY = position.y + totalHeight / 2 + 40;
+                startY = position.y + totalHeight / 2;
             }
 
             let currentX = startX;
@@ -775,8 +786,49 @@
             return allSegments;
         }
 
-        function generateImageGcode(obj, config) { /* ... G-code logic for images ... */ return []; }
-        function generateFractalGcode(obj, config) { /* ... G-code logic for fractals ... */ return []; }
+        function generateImageGcode(obj, config) {
+            let gcode = [];
+            const { position, properties, tracedLines, originalImageData } = obj;
+            const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
+            const scale = properties.size / originalImageData.width;
+            const totalHeight = originalImageData.height * scale;
+            const startX = position.x - properties.size / 2;
+            const startY = position.y + totalHeight / 2;
+            tracedLines.forEach(line => {
+                const p1x = startX + line.x1 * scale, p1y = startY - line.y1 * scale;
+                const p2x = startX + line.x2 * scale, p2y = startY - line.y2 * scale;
+                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${p1x.toFixed(2)} Y${(p1y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${p2x.toFixed(2)} Y${(p2y + 20).toFixed(2)} F${writeSpeed}`);
+            });
+            return gcode;
+        }
+
+        function generateFractalGcode(obj, config) {
+            let gcode = [];
+            const { position, properties } = obj;
+            const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
+            const pathInfo = getFractalPath(properties);
+            if (!pathInfo || pathInfo.data.length === 0) return ["; FEHLER"];
+            const xs = pathInfo.data.flatMap(p => pathInfo.isLineSegments ? [p.p1.x, p.p2.x] : [p.x]);
+            const ys = pathInfo.data.flatMap(p => pathInfo.isLineSegments ? [p.p1.y, p.p2.y] : [p.y]);
+            const minX = Math.min(...xs), minY = Math.min(...ys), maxX = Math.max(...xs), maxY = Math.max(...ys);
+            const translateX = position.x - (minX + (maxX - minX) / 2);
+            const translateY = position.y - (minY + (maxY - minY) / 2);
+            const transform = p => ({ x: p.x + translateX, y: p.y + translateY });
+            if (pathInfo.isLineSegments) {
+                pathInfo.data.forEach(line => {
+                    const s = transform(line.p1), e = transform(line.p2);
+                    gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${s.x.toFixed(2)} Y${(s.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${e.x.toFixed(2)} Y${(e.y + 20).toFixed(2)} F${writeSpeed}`);
+                });
+            } else {
+                const start = transform(pathInfo.data[0]);
+                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${start.x.toFixed(2)} Y${(start.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
+                for (let i=1; i<pathInfo.data.length; i++) {
+                    const p = transform(pathInfo.data[i]);
+                    gcode.push(`G1 X${p.x.toFixed(2)} Y${(p.y + 20).toFixed(2)} F${writeSpeed}`);
+                }
+            }
+            return gcode;
+        }
 
 
         // --- Event Listener Binding ---
@@ -853,11 +905,11 @@
             const scale = properties.size / originalImageData.width;
             const totalHeight = originalImageData.height * scale;
             const startX = position.x - properties.size / 2;
-            const startY = position.y + totalHeight / 2 + 40;
+            const startY = position.y + totalHeight / 2;
             tracedLines.forEach(line => {
                 const p1x = startX + line.x1 * scale, p1y = startY - line.y1 * scale;
                 const p2x = startX + line.x2 * scale, p2y = startY - line.y2 * scale;
-                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${p1x.toFixed(2)} Y${p1y.toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${p2x.toFixed(2)} Y${p2y.toFixed(2)} F${writeSpeed}`);
+                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${p1x.toFixed(2)} Y${(p1y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${p2x.toFixed(2)} Y${(p2y + 20).toFixed(2)} F${writeSpeed}`);
             });
             return gcode;
         }
@@ -872,19 +924,19 @@
             const ys = pathInfo.data.flatMap(p => pathInfo.isLineSegments ? [p.p1.y, p.p2.y] : [p.y]);
             const minX = Math.min(...xs), minY = Math.min(...ys), maxX = Math.max(...xs), maxY = Math.max(...ys);
             const translateX = position.x - (minX + (maxX - minX) / 2);
-            const translateY = position.y - (minY + (maxY - minY) / 2) + 40;
+            const translateY = position.y - (minY + (maxY - minY) / 2);
             const transform = p => ({ x: p.x + translateX, y: p.y + translateY });
             if (pathInfo.isLineSegments) {
                 pathInfo.data.forEach(line => {
                     const s = transform(line.p1), e = transform(line.p2);
-                    gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${s.x.toFixed(2)} Y${s.y.toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${e.x.toFixed(2)} Y${e.y.toFixed(2)} F${writeSpeed}`);
+                    gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${s.x.toFixed(2)} Y${(s.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${e.x.toFixed(2)} Y${(e.y + 20).toFixed(2)} F${writeSpeed}`);
                 });
             } else {
                 const start = transform(pathInfo.data[0]);
-                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${start.x.toFixed(2)} Y${start.y.toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
+                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${start.x.toFixed(2)} Y${(start.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
                 for (let i=1; i<pathInfo.data.length; i++) {
                     const p = transform(pathInfo.data[i]);
-                    gcode.push(`G1 X${p.x.toFixed(2)} Y${p.y.toFixed(2)} F${writeSpeed}`);
+                    gcode.push(`G1 X${p.x.toFixed(2)} Y${(p.y + 20).toFixed(2)} F${writeSpeed}`);
                 }
             }
             return gcode;
