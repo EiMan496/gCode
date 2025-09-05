@@ -67,6 +67,9 @@
             <button id="generateButton" class="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md shadow-md hover:bg-indigo-700 transition" disabled>
                 G-Code für alle Objekte generieren
             </button>
+            <button id="toggleViewBtn" class="w-full mt-2 px-4 py-2 bg-gray-600 text-white font-semibold rounded-md shadow-md hover:bg-gray-700 transition" style="display: none;">
+                Ansicht wechseln
+            </button>
             <div id="gcodeContainer" class="hidden mt-4">
                  <div id="gcodeOutput">...</div>
                  <button id="downloadButton" class="w-full mt-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-md shadow-md hover:bg-green-700 transition">
@@ -167,6 +170,7 @@
         let objectMeshes = [];
         let isDragging = false;
         let dragOffset = new THREE.Vector3();
+        let currentView = 'design';
 
         // --- UI Elemente ---
         const propertiesPanel = document.getElementById('propertiesPanel');
@@ -177,6 +181,7 @@
         const gcodeContainer = document.getElementById('gcodeContainer');
         const gcodeOutput = document.getElementById('gcodeOutput');
         const imageUpload = document.getElementById('imageUpload');
+        const toggleViewBtn = document.getElementById('toggleViewBtn');
         
         // --- Initialisierung ---
         function init() {
@@ -211,8 +216,17 @@
 
             const paperMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
             const paperMesh = new THREE.Mesh(new THREE.PlaneGeometry(PAPER_WIDTH, PAPER_HEIGHT), paperMaterial);
-            paperMesh.position.set(PAPER_WIDTH / 2, BED_HEIGHT - PAPER_HEIGHT / 2, 0);
+            paperMesh.position.set(PAPER_WIDTH / 2, PAPER_HEIGHT / 2, 0);
             scene.add(paperMesh);
+
+            // Safe zone visualization
+            const safeAreaWidth = PAPER_WIDTH - 60; // 30mm margin left/right
+            const safeAreaHeight = PAPER_HEIGHT - 70; // 70mm margin top
+            const safeAreaGeometry = new THREE.PlaneGeometry(safeAreaWidth, safeAreaHeight);
+            const safeAreaMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide, transparent: true, opacity: 0.1 });
+            const safeAreaMesh = new THREE.Mesh(safeAreaGeometry, safeAreaMaterial);
+            safeAreaMesh.position.set(PAPER_WIDTH / 2, safeAreaHeight / 2, 0.01);
+            scene.add(safeAreaMesh);
 
             plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
             raycaster = new THREE.Raycaster();
@@ -273,7 +287,20 @@
                 const intersectionPoint = new THREE.Vector3();
                 raycaster.setFromCamera(pointer, camera);
                 raycaster.ray.intersectPlane(plane, intersectionPoint);
-                const newPos = intersectionPoint.sub(dragOffset);
+                let newPos = intersectionPoint.sub(dragOffset);
+
+                // Constrain to safe zone
+                const safeXMin = 30;
+                const safeXMax = PAPER_WIDTH - 30;
+                const safeYMin = 0;
+                const safeYMax = PAPER_HEIGHT - 70;
+
+                const objectWidth = selectedObject.mesh.children[1].geometry.parameters.width;
+                const objectHeight = selectedObject.mesh.children[1].geometry.parameters.height;
+
+                newPos.x = Math.max(safeXMin + objectWidth / 2, Math.min(safeXMax - objectWidth / 2, newPos.x));
+                newPos.y = Math.max(safeYMin + objectHeight / 2, Math.min(safeYMax - objectHeight / 2, newPos.y));
+
                 selectedObject.mesh.position.copy(newPos);
                 selectedObject.data.position.x = newPos.x;
                 selectedObject.data.position.y = newPos.y;
@@ -303,7 +330,7 @@
         // --- Objekt-Management ---
         function addObject(type, data = {}) {
             const newId = Date.now();
-            const defaultPosition = { x: PAPER_WIDTH / 2, y: BED_HEIGHT - PAPER_HEIGHT / 2 };
+            const defaultPosition = { x: PAPER_WIDTH / 2, y: (PAPER_HEIGHT - 70) / 2 };
             let newObjectData;
 
             switch (type) {
@@ -454,7 +481,6 @@
         function renderAllObjects() {
             const simGroup = scene.getObjectByName('simulationGroup');
             if (simGroup) simGroup.visible = false;
-            document.getElementById('simulationControls').style.display = 'none';
 
             objectMeshes.forEach(mesh => {
                 scene.remove(mesh);
@@ -497,6 +523,7 @@
                 scene.add(group);
                 objectMeshes.push(group);
             });
+            setView(currentView);
         }
         
         function updateObjectList() {
@@ -628,9 +655,11 @@
             const { type, properties } = objData;
 
             if(type === 'text') {
-                const segments = generateTextLineSegments(objData, false); // false = local coordinates
-                segments.forEach(seg => {
-                    allPoints.push(new THREE.Vector3(seg.p1.x, seg.p1.y, 0), new THREE.Vector3(seg.p2.x, seg.p2.y, 0));
+                const strokes = generateTextLineStrokes(objData); // Returns strokes now
+                strokes.forEach(stroke => {
+                    stroke.forEach(seg => {
+                        allPoints.push(new THREE.Vector3(seg.p1.x, seg.p1.y, 0), new THREE.Vector3(seg.p2.x, seg.p2.y, 0));
+                    });
                 });
             } else if (type === 'image') {
                 const { tracedLines, size } = { ...objData, ...properties};
@@ -672,6 +701,21 @@
             gcodeOutput.textContent = gcode.join('\n');
             gcodeContainer.classList.remove('hidden');
             setupSimulation(gcode);
+            setView('simulation');
+        }
+
+        function setView(viewName) {
+            currentView = viewName;
+            const simGroup = scene.getObjectByName('simulationGroup');
+
+            if (viewName === 'simulation') {
+                if(simGroup) simGroup.visible = true;
+                objectMeshes.forEach(m => m.visible = false);
+                toggleViewBtn.style.display = 'block';
+            } else { // design view
+                if(simGroup) simGroup.visible = false;
+                objectMeshes.forEach(m => m.visible = true);
+            }
         }
 
         function setupSimulation(gcode) {
@@ -726,8 +770,6 @@
                 simGroup.add(simPen);
                 scene.add(simGroup);
             }
-            simGroup.visible = true;
-            objectMeshes.forEach(m => m.visible = false);
 
             slider.oninput = (e) => updateSimulation(parseInt(e.target.value));
             updateSimulation(0);
@@ -737,21 +779,20 @@
             const simGroup = scene.getObjectByName('simulationGroup');
             const simulationLine = simGroup.getObjectByName('simulationLine');
             const simulationPen = simGroup.getObjectByName('simulationPen');
-            const xOffset = -20; // Visual offset for simulation only
-            const yOffset = -60; // Visual offset for simulation only
+            const penOffsetY = 60; // G-code has offset, so simulation needs it too
 
             const pointsToDraw = [];
             for (let i = 0; i < index; i++) {
                 const seg = simulationSegments[i];
                 if (seg.isDrawing) {
-                    pointsToDraw.push(new THREE.Vector3(seg.p1.x + xOffset, seg.p1.y + yOffset, 0.2), new THREE.Vector3(seg.p2.x + xOffset, seg.p2.y + yOffset, 0.2));
+                    pointsToDraw.push(new THREE.Vector3(seg.p1.x, seg.p1.y - penOffsetY, 0.2), new THREE.Vector3(seg.p2.x, seg.p2.y - penOffsetY, 0.2));
                 }
             }
             simulationLine.geometry.setFromPoints(pointsToDraw);
 
             const currentPoint = (index > 0) ? simulationSegments[index - 1].p2 : {x:0, y:0};
             const isDrawing = (index > 0) ? simulationSegments[index - 1].isDrawing : false;
-            simulationPen.position.set(currentPoint.x + xOffset, currentPoint.y + yOffset, 5);
+            simulationPen.position.set(currentPoint.x, currentPoint.y - penOffsetY, 5);
             simulationPen.material.color.set(isDrawing ? 0x00cc00 : 0xcc0000);
         }
 
@@ -761,16 +802,18 @@
             const { position, properties } = obj;
             const { rotation } = properties;
 
-            // Get segments in local coordinates
-            const segments = generateTextLineSegments(obj, false);
+            // Get strokes in local coordinates
+            const strokes = generateTextLineStrokes(obj);
 
             // Create a temporary geometry to find the exact center, mirroring the preview logic
-            const points = [];
-            segments.forEach(seg => {
-                points.push(new THREE.Vector3(seg.p1.x, seg.p1.y, 0));
-                points.push(new THREE.Vector3(seg.p2.x, seg.p2.y, 0));
+            const allPoints = [];
+            strokes.forEach(stroke => {
+                stroke.forEach(seg => {
+                    allPoints.push(new THREE.Vector3(seg.p1.x, seg.p1.y, 0));
+                    allPoints.push(new THREE.Vector3(seg.p2.x, seg.p2.y, 0));
+                });
             });
-            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const geometry = new THREE.BufferGeometry().setFromPoints(allPoints);
             geometry.computeBoundingBox();
             const center = new THREE.Vector3();
             geometry.boundingBox.getCenter(center);
@@ -778,33 +821,36 @@
             const angleRad = THREE.MathUtils.degToRad(rotation || 0);
             const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
 
-            segments.forEach(seg => {
-                // Apply all transformations: center, rotate, then translate
-                const p1_centered = { x: seg.p1.x - center.x, y: seg.p1.y - center.y };
-                const p2_centered = { x: seg.p2.x - center.x, y: seg.p2.y - center.y };
+            const transformPoint = (p) => {
+                const p_centered = { x: p.x - center.x, y: p.y - center.y };
+                const p_rot = { x: p_centered.x * cosA - p_centered.y * sinA, y: p_centered.x * sinA + p_centered.y * cosA };
+                return { x: p_rot.x + position.x, y: p_rot.y + position.y };
+            };
 
-                const p1_rot = { x: p1_centered.x * cosA - p1_centered.y * sinA, y: p1_centered.x * sinA + p1_centered.y * cosA };
-                const p2_rot = { x: p2_centered.x * cosA - p2_centered.y * sinA, y: p2_centered.x * sinA + p2_centered.y * cosA };
+            strokes.forEach(stroke => {
+                if (stroke.length === 0) return;
+                // Transform the first point and move to it
+                const firstPoint = transformPoint(stroke[0].p1);
+                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`);
+                gcode.push(`G0 X${(firstPoint.x).toFixed(2)} Y${(firstPoint.y + 60).toFixed(2)} F${travelSpeed}`);
 
-                const p1_final = { x: p1_rot.x + position.x, y: p1_rot.y + position.y };
-                const p2_final = { x: p2_rot.x + position.x, y: p2_rot.y + position.y };
+                // Lower pen and draw the rest of the stroke
+                gcode.push(`G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
 
-                gcode.push(
-                    `G0 Z${travelZ.toFixed(2)} F${zSpeed}`,
-                    `G0 X${(p1_final.x + 20).toFixed(2)} Y${(p1_final.y + 20).toFixed(2)} F${travelSpeed}`,
-                    `G1 Z${writingZ.toFixed(2)} F${zSpeed}`,
-                    `G1 X${(p2_final.x + 20).toFixed(2)} Y${(p2_final.y + 20).toFixed(2)} F${writeSpeed}`
-                );
+                stroke.forEach(seg => {
+                    const p2_final = transformPoint(seg.p2);
+                    gcode.push(`G1 X${(p2_final.x).toFixed(2)} Y${(p2_final.y + 60).toFixed(2)} F${writeSpeed}`);
+                });
             });
             return gcode;
         }
 
-        function generateTextLineSegments(objData, useWorldCoordinates) {
-            const { content, position, properties } = objData;
-            const { scale, charSpacing, lineSpacing, thickness, rotation } = properties;
+        function generateTextLineStrokes(objData) {
+            const { content, properties } = objData;
+            const { scale, charSpacing, lineSpacing, thickness } = properties;
 
-            let localSegments = [];
-            let currentX = 0, currentY = 0, textWidth = 0;
+            let allStrokes = [];
+            let currentX = 0, currentY = 0;
             let lines = content.toUpperCase().split('\n');
             const lineHeights = lines.map(line => BASE_CHAR_HEIGHT * scale);
             const totalHeight = lineHeights.reduce((a,b) => a+b, 0) + Math.max(0, lines.length - 1) * lineSpacing;
@@ -820,23 +866,32 @@
                 for (const char of line) {
                     if (charPaths[char]) {
                         charPaths[char].forEach(stroke => {
+                            const strokeSegments = [];
                             for (let i = 0; i < stroke.length - 1; i++) {
                                 const p1 = { x: currentX + stroke[i].x * scale, y: currentY + stroke[i].y * scale };
                                 const p2 = { x: currentX + stroke[i+1].x * scale, y: currentY + stroke[i+1].y * scale };
-                                localSegments.push({ p1, p2 });
-                                if (thickness > 0.01) {
-                                    const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.sqrt(dx * dx + dy * dy);
-                                    if (len > 0) {
-                                        const perp = { x: -dy / len, y: dx / len };
-                                        const fillDensity = 0.4; // Draw a line every 0.4mm
-                                        const lineCount = Math.floor(thickness / fillDensity);
-                                        for (let j = 1; j <= lineCount; j++) {
-                                            const currentThickness = j * fillDensity;
+                                strokeSegments.push({ p1, p2 });
+                            }
+                            allStrokes.push(strokeSegments);
+
+                            if (thickness > 0.01) {
+                                const fillDensity = 0.4;
+                                const lineCount = Math.floor(thickness / fillDensity);
+                                for (let j = 1; j <= lineCount; j++) {
+                                    const currentThickness = j * fillDensity;
+                                    const thicknessStrokeSegments = [];
+                                    for (let i = 0; i < stroke.length - 1; i++) {
+                                        const p1 = { x: currentX + stroke[i].x * scale, y: currentY + stroke[i].y * scale };
+                                        const p2 = { x: currentX + stroke[i+1].x * scale, y: currentY + stroke[i+1].y * scale };
+                                        const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.sqrt(dx * dx + dy * dy);
+                                        if (len > 0) {
+                                            const perp = { x: -dy / len, y: dx / len };
                                             const p1_offset = { x: p1.x + perp.x * currentThickness, y: p1.y + perp.y * currentThickness };
                                             const p2_offset = { x: p2.x + perp.x * currentThickness, y: p2.y + perp.y * currentThickness };
-                                            localSegments.push({ p1: p1_offset, p2: p2_offset });
+                                            thicknessStrokeSegments.push({ p1: p1_offset, p2: p2_offset });
                                         }
                                     }
+                                    allStrokes.push(thicknessStrokeSegments);
                                 }
                             }
                         });
@@ -846,18 +901,7 @@
                 currentY -= lineSpacing;
             });
 
-            const angleRad = THREE.MathUtils.degToRad(rotation || 0);
-            const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
-            const finalPos = useWorldCoordinates ? position : {x: 0, y: 0};
-
-            return localSegments.map(seg => {
-                const p1_rot = { x: seg.p1.x * cosA - seg.p1.y * sinA, y: seg.p1.x * sinA + seg.p1.y * cosA };
-                const p2_rot = { x: seg.p2.x * cosA - seg.p2.y * sinA, y: seg.p2.x * sinA + seg.p2.y * cosA };
-                return {
-                    p1: { x: p1_rot.x + finalPos.x, y: p1_rot.y + finalPos.y },
-                    p2: { x: p2_rot.x + finalPos.x, y: p2_rot.y + finalPos.y }
-                };
-            });
+            return allStrokes;
         }
 
         function generateImageGcode(obj, config) {
@@ -883,7 +927,7 @@
                 const p1_final = { x: p1_rot.x + position.x, y: p1_rot.y + position.y };
                 const p2_final = { x: p2_rot.x + position.x, y: p2_rot.y + position.y };
 
-                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${(p1_final.x + 20).toFixed(2)} Y${(p1_final.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${(p2_final.x + 20).toFixed(2)} Y${(p2_final.y + 20).toFixed(2)} F${writeSpeed}`);
+                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${(p1_final.x).toFixed(2)} Y${(p1_final.y + 60).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${(p2_final.x).toFixed(2)} Y${(p2_final.y + 60).toFixed(2)} F${writeSpeed}`);
             });
             return gcode;
         }
@@ -908,14 +952,14 @@
             if (pathInfo.isLineSegments) {
                 pathInfo.data.forEach(line => {
                     const s = transform(line.p1), e = transform(line.p2);
-                    gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${(s.x + 20).toFixed(2)} Y${(s.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${(e.x + 20).toFixed(2)} Y${(e.y + 20).toFixed(2)} F${writeSpeed}`);
+                    gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${(s.x).toFixed(2)} Y${(s.y + 60).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${(e.x).toFixed(2)} Y${(e.y + 60).toFixed(2)} F${writeSpeed}`);
                 });
             } else {
                 const start = transform(pathInfo.data[0]);
-                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${(start.x + 20).toFixed(2)} Y${(start.y + 20).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
+                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${(start.x).toFixed(2)} Y${(start.y + 60).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
                 for (let i=1; i<pathInfo.data.length; i++) {
                     const p = transform(pathInfo.data[i]);
-                    gcode.push(`G1 X${(p.x + 20).toFixed(2)} Y${(p.y + 20).toFixed(2)} F${writeSpeed}`);
+                    gcode.push(`G1 X${(p.x).toFixed(2)} Y${(p.y + 60).toFixed(2)} F${writeSpeed}`);
                 }
             }
             return gcode;
@@ -935,6 +979,9 @@
              a.download = `plotter_output_${Date.now()}.gcode`;
              a.click();
              URL.revokeObjectURL(a.href);
+        });
+        toggleViewBtn.addEventListener('click', () => {
+            setView(currentView === 'design' ? 'simulation' : 'design');
         });
         
         init();
