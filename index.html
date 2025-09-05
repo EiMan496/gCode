@@ -298,8 +298,15 @@
                 const objectWidth = selectedObject.mesh.children[1].geometry.parameters.width;
                 const objectHeight = selectedObject.mesh.children[1].geometry.parameters.height;
 
-                newPos.x = Math.max(safeXMin + objectWidth / 2, Math.min(safeXMax - objectWidth / 2, newPos.x));
-                newPos.y = Math.max(safeYMin + objectHeight / 2, Math.min(safeYMax - objectHeight / 2, newPos.y));
+                const angleRad = THREE.MathUtils.degToRad(selectedObject.data.properties.rotation || 0);
+                const cosA = Math.abs(Math.cos(angleRad));
+                const sinA = Math.abs(Math.sin(angleRad));
+
+                const rotatedWidth = objectWidth * cosA + objectHeight * sinA;
+                const rotatedHeight = objectWidth * sinA + objectHeight * cosA;
+
+                newPos.x = Math.max(safeXMin + rotatedWidth / 2, Math.min(safeXMax - rotatedWidth / 2, newPos.x));
+                newPos.y = Math.max(safeYMin + rotatedHeight / 2, Math.min(safeYMax - rotatedHeight / 2, newPos.y));
 
                 selectedObject.mesh.position.copy(newPos);
                 selectedObject.data.position.x = newPos.x;
