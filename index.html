@@ -220,12 +220,12 @@
             scene.add(paperMesh);
 
             // Safe zone visualization
-            const safeAreaWidth = PAPER_WIDTH - 60; // 30mm margin left/right
-            const safeAreaHeight = PAPER_HEIGHT - 70; // 70mm margin top
+            const safeAreaWidth = PAPER_WIDTH - 25 - 25; // 25mm margin left/right
+            const safeAreaHeight = PAPER_HEIGHT - 70 - 20; // 70mm top, 20mm bottom
             const safeAreaGeometry = new THREE.PlaneGeometry(safeAreaWidth, safeAreaHeight);
             const safeAreaMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide, transparent: true, opacity: 0.1 });
             const safeAreaMesh = new THREE.Mesh(safeAreaGeometry, safeAreaMaterial);
-            safeAreaMesh.position.set(PAPER_WIDTH / 2, safeAreaHeight / 2, 0.01);
+            safeAreaMesh.position.set(PAPER_WIDTH / 2, 20 + safeAreaHeight / 2, 0.01);
             scene.add(safeAreaMesh);
 
             plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -290,9 +290,9 @@
                 let newPos = intersectionPoint.sub(dragOffset);
 
                 // Constrain to safe zone
-                const safeXMin = 30;
-                const safeXMax = PAPER_WIDTH - 30;
-                const safeYMin = 0;
+                const safeXMin = 25;
+                const safeXMax = PAPER_WIDTH - 25;
+                const safeYMin = 20;
                 const safeYMax = PAPER_HEIGHT - 70;
 
                 const objectWidth = selectedObject.mesh.children[1].geometry.parameters.width;
@@ -330,7 +330,7 @@
         // --- Objekt-Management ---
         function addObject(type, data = {}) {
             const newId = Date.now();
-            const defaultPosition = { x: PAPER_WIDTH / 2, y: (PAPER_HEIGHT - 70) / 2 };
+            const defaultPosition = { x: PAPER_WIDTH / 2, y: 20 + (PAPER_HEIGHT - 70 - 20) / 2 };
             let newObjectData;
 
             switch (type) {
