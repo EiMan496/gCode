@@ -110,6 +110,8 @@
                     <option value="sierpinski_triangle">Sierpinski-Dreieck</option>
                     <option value="hilbert_curve">Hilbert-Kurve</option>
                     <option value="archimedean_spiral">Archimedische Spirale</option>
+                    <option value="fractal_plant">Fraktale Pflanze</option>
+                    <option value="fractal_tree">Fraktaler Baum</option>
                 </select>
             </div>
             <div class="mt-2">
@@ -121,6 +123,8 @@
                 <div data-fractal="sierpinski_triangle" style="display:none;"><label class="block config-label mb-1">Iterationen:</label><input type="number" id="propSierpinskiIterations" value="4" min="1" max="7" step="1" class="config-input"></div>
                 <div data-fractal="hilbert_curve" style="display:none;"><label class="block config-label mb-1">Ordnung:</label><input type="number" id="propHilbertIterations" value="3" min="1" max="6" step="1" class="config-input"></div>
                 <div data-fractal="archimedean_spiral" style="display:none;"><label class="block config-label mb-1">Windungen:</label><input type="number" id="propSpiralTurns" value="5" min="1" step="1" class="config-input"><label class="block config-label mt-2 mb-1">Abstand:</label><input type="number" id="propSpiralSpacing" value="5" min="0.1" step="0.5" class="config-input"></div>
+                <div data-fractal="fractal_plant" style="display:none;"><label class="block config-label mb-1">Iterationen:</label><input type="number" id="propPlantIterations" value="4" min="1" max="6" step="1" class="config-input"></div>
+                <div data-fractal="fractal_tree" style="display:none;"><label class="block config-label mb-1">Iterationen:</label><input type="number" id="propTreeIterations" value="4" min="1" max="7" step="1" class="config-input"></div>
             </div>
             <div class="mt-2">
                 <label for="propRotation" class="block config-label mb-1">Rotation (°): <span id="rotationValue">0</span></label>
@@ -143,6 +147,7 @@
                     <option value="horizontal">Horizontal</option>
                     <option value="vertical">Vertikal</option>
                     <option value="cross">Gekreuzt</option>
+                    <option value="ascii">ASCII Art</option>
                 </select>
             </div>
             <div class="mt-2">
@@ -220,7 +225,7 @@
             scene.add(paperMesh);
 
             // Safe zone visualization
-            const safeAreaWidth = PAPER_WIDTH - 25 - 25; // 25mm margin left/right
+            const safeAreaWidth = PAPER_WIDTH - 35 - 35; // 35mm margin left/right
             const safeAreaHeight = PAPER_HEIGHT - 70 - 30; // 70mm top, 30mm bottom
             const safeAreaGeometry = new THREE.PlaneGeometry(safeAreaWidth, safeAreaHeight);
             const safeAreaMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide, transparent: true, opacity: 0.1 });
@@ -290,8 +295,8 @@
                 let newPos = intersectionPoint.sub(dragOffset);
 
                 // Constrain to safe zone
-                const safeXMin = 25;
-                const safeXMax = PAPER_WIDTH - 25;
+                const safeXMin = 35;
+                const safeXMax = PAPER_WIDTH - 35;
                 const safeYMin = 30;
                 const safeYMax = PAPER_HEIGHT - 70;
 
@@ -393,6 +398,44 @@
         }
 
         // --- Bildverarbeitung ---
+        function generateAsciiArt(imageData, density) {
+            const { data, width, height } = imageData;
+            const ramp = ' .:-=+*#%@';
+            const charPixelWidth = Math.max(1, 22 - density);
+            const charPixelHeight = charPixelWidth * 2;
+
+            let ascii = '';
+            for (let y = 0; y < height; y += charPixelHeight) {
+                let line = '';
+                for (let x = 0; x < width; x += charPixelWidth) {
+                    let totalBrightness = 0;
+                    let count = 0;
+                    for (let j = 0; j < charPixelHeight && (y + j) < height; j++) {
+                        for (let i = 0; i < charPixelWidth && (x + i) < width; i++) {
+                            const idx = ((y + j) * width + (x + i)) * 4;
+                            totalBrightness += 0.299 * data[idx] + 0.587 * data[idx+1] + 0.114 * data[idx+2];
+                            count++;
+                        }
+                    }
+                    const avgBrightness = count > 0 ? totalBrightness / count : 0;
+                    const rampIndex = Math.floor((avgBrightness / 255) * (ramp.length - 1));
+                    line += ramp[ramp.length - 1 - rampIndex];
+                }
+                ascii += line + '\n';
+            }
+            return ascii;
+        }
+
+        function regenerateImageData(objData) {
+            if (objData.properties.hatchStyle === 'ascii') {
+                objData.asciiContent = generateAsciiArt(objData.originalImageData, objData.properties.hatchDensity);
+                objData.tracedLines = [];
+            } else {
+                objData.asciiContent = null;
+                objData.tracedLines = traceImage(objData.originalImageData, objData.properties.threshold, objData.properties.hatchStyle, objData.properties.hatchDensity);
+            }
+        }
+
         function handleImageUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -596,14 +639,14 @@
                     const newThreshold = parseInt(e.target.value);
                     selectedObject.data.properties.threshold = newThreshold;
                     thresholdValue.textContent = newThreshold;
-                    selectedObject.data.tracedLines = traceImage(selectedObject.data.originalImageData, newThreshold, selectedObject.data.properties.hatchStyle, selectedObject.data.properties.hatchDensity);
+                    regenerateImageData(selectedObject.data);
                     renderAllObjects();
                 };
 
                 document.getElementById('propImageHatchStyle').value = obj.properties.hatchStyle;
                 document.getElementById('propImageHatchStyle').onchange = e => {
                     selectedObject.data.properties.hatchStyle = e.target.value;
-                    selectedObject.data.tracedLines = traceImage(selectedObject.data.originalImageData, selectedObject.data.properties.threshold, selectedObject.data.properties.hatchStyle, selectedObject.data.properties.hatchDensity);
+                    regenerateImageData(selectedObject.data);
                     renderAllObjects();
                 };
 
@@ -615,7 +658,7 @@
                     const newDensity = parseInt(e.target.value);
                     selectedObject.data.properties.hatchDensity = newDensity;
                     densityValue.textContent = newDensity;
-                    selectedObject.data.tracedLines = traceImage(selectedObject.data.originalImageData, selectedObject.data.properties.threshold, selectedObject.data.properties.hatchStyle, newDensity);
+                    regenerateImageData(selectedObject.data);
                     renderAllObjects();
                 };
             } else if (obj.type === 'fractal') {
@@ -635,6 +678,8 @@
                 document.getElementById('propKochIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propSierpinskiIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propHilbertIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
+                document.getElementById('propPlantIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
+                document.getElementById('propTreeIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propSpiralTurns').oninput = e => {selectedObject.data.properties.turns = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propSpiralSpacing').oninput = e => {selectedObject.data.properties.spacing = parseFloat(e.target.value); renderAllObjects();};
                 
@@ -669,11 +714,28 @@
                     });
                 });
             } else if (type === 'image') {
-                const { tracedLines, size } = { ...objData, ...properties};
-                const scale = size / objData.originalImageData.width;
-                tracedLines.forEach(line => {
-                    allPoints.push(new THREE.Vector3(line.x1 * scale, -line.y1 * scale, 0), new THREE.Vector3(line.x2 * scale, -line.y2 * scale, 0));
-                });
+                if (properties.hatchStyle === 'ascii' && objData.asciiContent) {
+                    const ascii_char_pixel_width = Math.max(1, 22 - properties.hatchDensity);
+                    const num_chars_wide = objData.originalImageData.width / ascii_char_pixel_width;
+                    const desired_total_width = properties.size;
+                    const scale = desired_total_width / (num_chars_wide * BASE_CHAR_WIDTH);
+
+                    const textObj = {
+                        content: objData.asciiContent,
+                        properties: { scale, charSpacing: 0, lineSpacing: 0, thickness: 0 }
+                    };
+                    const strokes = generateTextLineStrokes(textObj);
+                    strokes.forEach(stroke => {
+                        stroke.forEach(seg => {
+                            allPoints.push(new THREE.Vector3(seg.p1.x, seg.p1.y, 0), new THREE.Vector3(seg.p2.x, seg.p2.y, 0));
+                        });
+                    });
+                } else if (objData.tracedLines) {
+                    const scale = properties.size / objData.originalImageData.width;
+                    objData.tracedLines.forEach(line => {
+                        allPoints.push(new THREE.Vector3(line.x1 * scale, -line.y1 * scale, 0), new THREE.Vector3(line.x2 * scale, -line.y2 * scale, 0));
+                    });
+                }
             } else if (type === 'fractal') {
                 let pathData = getFractalPath(properties);
                 if (pathData.isLineSegments) {
@@ -912,8 +974,29 @@
         }
 
         function generateImageGcode(obj, config) {
+            const { properties } = obj;
+            if (properties.hatchStyle === 'ascii' && obj.asciiContent) {
+                const ascii_char_pixel_width = Math.max(1, 22 - properties.hatchDensity);
+                const num_chars_wide = obj.originalImageData.width / ascii_char_pixel_width;
+                const desired_total_width = properties.size;
+                const scale = desired_total_width / (num_chars_wide * BASE_CHAR_WIDTH);
+
+                const textObj = {
+                    content: obj.asciiContent,
+                    position: obj.position,
+                    properties: {
+                        scale: scale,
+                        charSpacing: 0,
+                        lineSpacing: 0,
+                        thickness: 0,
+                        rotation: properties.rotation
+                    }
+                };
+                return generateTextGcode(textObj, config);
+            }
+
             let gcode = [];
-            const { position, properties, tracedLines, originalImageData } = obj;
+            const { position, tracedLines, originalImageData } = obj;
             const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
             const { size, rotation } = properties;
 
@@ -996,13 +1079,52 @@
         // --- HILFSFUNKTIONEN (Fraktale & G-Code) ---
         // (Hier sind alle fehlenden Implementierungen)
         Object.assign(fractalGenerators, {
+            expandLSystem(axiom, rules, iterations) {
+                let current = axiom;
+                for (let i = 0; i < iterations; i++) {
+                    current = current.split('').map(char => rules[char] || char).join('');
+                }
+                return current;
+            },
+            interpretLSystem(lsystemString, angle, initialLength = 5, initialAngle = 90) {
+                const lines = [];
+                const stack = [];
+                let currentPos = { x: 0, y: 0 };
+                let currentAngle = THREE.MathUtils.degToRad(initialAngle);
+
+                for (const char of lsystemString) {
+                    switch (char) {
+                        case 'F': case 'G': case '0': case '1':
+                            const newX = currentPos.x + initialLength * Math.cos(currentAngle);
+                            const newY = currentPos.y + initialLength * Math.sin(currentAngle);
+                            lines.push({ p1: { ...currentPos }, p2: { x: newX, y: newY } });
+                            currentPos = { x: newX, y: newY };
+                            break;
+                        case '+':
+                            currentAngle += THREE.MathUtils.degToRad(angle);
+                            break;
+                        case '-':
+                            currentAngle -= THREE.MathUtils.degToRad(angle);
+                            break;
+                        case '[':
+                            stack.push({ pos: { ...currentPos }, angle: currentAngle });
+                            break;
+                        case ']':
+                            const state = stack.pop();
+                            currentPos = state.pos;
+                            currentAngle = state.angle;
+                            break;
+                    }
+                }
+                return { data: lines, isLineSegments: true };
+            },
             kochSegment(p1,p2,d){if(d===0)return[p1,p2];let a=Math.atan2(p2.y-p1.y,p2.x-p1.x),b=Math.sqrt(Math.pow(p2.x-p1.x,2)+Math.pow(p2.y-p1.y,2))/3,c={x:p1.x+(p2.x-p1.x)/3,y:p1.y+(p2.y-p1.y)/3},e={x:c.x+Math.cos(a-Math.PI/3)*b,y:c.y+Math.sin(a-Math.PI/3)*b},f={x:p1.x+2*(p2.x-p1.x)/3,y:p1.y+2*(p2.y-p1.y)/3};return[...this.kochSegment(p1,c,d-1).slice(0,-1),...this.kochSegment(c,e,d-1).slice(0,-1),...this.kochSegment(e,f,d-1).slice(0,-1),...this.kochSegment(f,p2,d-1)]},
             hilbertPath(o){let p="A",r={"A":"-BF+AFA+FB-","B":"+AF-BFB-FA+"};for(let i=0;i<o;i++)p=p.split("").map(c=>r[c]||c).join("");let t=[{x:0,y:0}],a=0;for(let c of p){let l=t[t.length-1];if(c==="F")t.push({x:l.x+Math.cos(a),y:l.y+Math.sin(a)});else if(c==="+")a-=Math.PI/2;else if(c==="-")a+=Math.PI/2}return t}
         });
 
         getFractalPath = function(props) {
             const { fractalType, size, iterations, turns, spacing } = props;
-            let data = [], isLineSegments = false;
+            let data = [], isLineSegments = false, path;
             switch(fractalType) {
                 case 'koch_snowflake':
                     const h=size*Math.sqrt(3)/2, p1={x:0,y:h*2/3}, p2={x:-size/2,y:-h/3}, p3={x:size/2,y:-h/3};
@@ -1023,6 +1145,12 @@
                     const b = spacing/(2*Math.PI), maxAngle=turns*2*Math.PI;
                     for(let i=0;i<=turns*100;i++){let a=(i/(turns*100))*maxAngle,r=b*a;data.push({x:r*Math.cos(a),y:r*Math.sin(a)})}
                     break;
+                case 'fractal_plant':
+                    path = fractalGenerators.expandLSystem('X', { 'X': 'F+[[X]-X]-F[-FX]+X', 'F': 'FF' }, iterations);
+                    return fractalGenerators.interpretLSystem(path, 25, size / (Math.pow(2, iterations + 2)));
+                case 'fractal_tree':
+                    path = fractalGenerators.expandLSystem('0', { '1': '11', '0': '1[0]0' }, iterations);
+                    return fractalGenerators.interpretLSystem(path, 45, size / (Math.pow(2, iterations + 1)));
             }
             return {data, isLineSegments};
         }
