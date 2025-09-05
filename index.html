@@ -47,7 +47,7 @@
             </div>
              <p class="text-xs text-gray-500 mt-2 text-center"><b>Steuerung:</b> Mausrad = Zoom, Linksklick = Drehen, <br><b>Strg + Linksklick</b> auf Objekt = Verschieben</p>
         </div>
-
+        
         <div id="objectListPanel" class="control-panel" style="display: none;">
             <h2>2. Objektliste</h2>
             <ul id="objectList" class="space-y-1"></ul>
@@ -177,7 +177,7 @@
         const gcodeContainer = document.getElementById('gcodeContainer');
         const gcodeOutput = document.getElementById('gcodeOutput');
         const imageUpload = document.getElementById('imageUpload');
-
+        
         // --- Initialisierung ---
         function init() {
             const container = document.getElementById('canvasContainer');
@@ -225,7 +225,7 @@
 
             animate();
         }
-
+        
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
@@ -265,7 +265,7 @@
                 }
             }
         }
-
+        
         function onPointerMove(event) {
             if (isDragging && selectedObject) {
                 event.preventDefault();
@@ -299,7 +299,7 @@
             }
             return null;
         }
-
+        
         // --- Objekt-Management ---
         function addObject(type, data = {}) {
             const newId = Date.now();
@@ -345,15 +345,15 @@
         function selectObjectById(id) {
             const objData = sceneObjects.find(obj => obj.id === id);
             if (!objData) return;
-
+            
             const objMesh = objectMeshes.find(m => m.userData.id === id);
             if (!objMesh) return;
-
+            
             selectedObject = { data: objData, mesh: objMesh };
-
+            
             objectMeshes.forEach(m => m.children[1].material.color.set(0x00aaff));
             objMesh.children[1].material.color.set(0xffa500);
-
+            
             updatePropertiesPanel();
             updateObjectList();
         }
@@ -385,55 +385,66 @@
             const { data, width, height } = imageData;
             hatchDensity = Math.max(1, hatchDensity);
 
-            const traceHorizontal = () => {
-                for (let y = 0; y < height; y += hatchDensity) {
-                    let inLine = false;
-                    let startX = 0;
-                    for (let x = 0; x < width; x++) {
-                        const i = (Math.floor(y) * width + x) * 4;
-                        const brightness = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-                        if (!inLine && brightness < threshold) {
-                            inLine = true;
-                            startX = x;
-                        } else if (inLine && (brightness >= threshold || x === width - 1)) {
-                            inLine = false;
-                            lines.push({ x1: startX, y1: y, x2: x, y2: y });
-                        }
-                    }
-                }
+            const getBrightness = (x, y) => {
+                const i = (y * width + x) * 4;
+                return 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
             };
 
-            const traceVertical = () => {
-                for (let x = 0; x < width; x += hatchDensity) {
+            const traceDiagonal = (angle) => {
+                const step = hatchDensity;
+                const rad = angle * Math.PI / 180;
+                const cos = Math.cos(rad);
+                const sin = Math.sin(rad);
+
+                for (let i = 0; i < width + height; i += step) {
                     let inLine = false;
-                    let startY = 0;
-                    for (let y = 0; y < height; y++) {
-                        const i = (y * width + Math.floor(x)) * 4;
-                        const brightness = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-                        if (!inLine && brightness < threshold) {
-                            inLine = true;
-                            startY = y;
-                        } else if (inLine && (brightness >= threshold || y === height - 1)) {
-                            inLine = false;
-                            lines.push({ x1: x, y1: startY, x2: x, y2: y });
+                    let p1 = null;
+
+                    for (let j = 0; j < Math.max(width, height) * 2; j++) {
+                        const x = Math.round(i * cos - j * sin);
+                        const y = Math.round(i * sin + j * cos);
+
+                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                            const brightness = getBrightness(x, y);
+                            if (!inLine && brightness < threshold) {
+                                inLine = true;
+                                p1 = { x, y };
+                            } else if (inLine && brightness >= threshold) {
+                                inLine = false;
+                                if (p1) {
+                                    lines.push({ x1: p1.x, y1: p1.y, x2: x, y2: y });
+                                    p1 = null;
+                                }
+                            }
+                        } else {
+                            if (inLine && p1) {
+                                inLine = false;
+                                lines.push({ x1: p1.x, y1: p1.y, x2: x, y2: y });
+                                p1 = null;
+                            }
                         }
+                    }
+                     if (inLine && p1) {
+                        const x = Math.round(i * cos - (Math.max(width, height) * 2 -1) * sin);
+                        const y = Math.round(i * sin + (Math.max(width, height) * 2-1) * cos);
+                        lines.push({ x1: p1.x, y1: p1.y, x2: x, y2: y });
                     }
                 }
             };
 
             switch (hatchStyle) {
                 case 'horizontal':
-                    traceHorizontal();
+                    traceDiagonal(0);
                     break;
                 case 'vertical':
-                    traceVertical();
+                    traceDiagonal(90);
                     break;
                 case 'cross':
-                    traceHorizontal();
-                    traceVertical();
+                    traceDiagonal(45);
+                    traceDiagonal(-45);
                     break;
                 default:
-                    traceHorizontal();
+                    traceDiagonal(0);
             }
             return lines;
         }
@@ -464,42 +475,42 @@
                 const box = geometry.boundingBox;
                 const size = new THREE.Vector3();
                 box.getSize(size);
-
+                
                 const boxColor = (selectedObject && selectedObject.data.id === objData.id) ? 0xffa500 : 0x00aaff;
                 const boxHelper = new THREE.Mesh(
                     new THREE.PlaneGeometry(Math.max(size.x, 1), Math.max(size.y, 1)),
                     new THREE.MeshBasicMaterial({ color: boxColor, transparent: true, opacity: 0.25, side: THREE.DoubleSide })
                 );
-
+                
                 const group = new THREE.Group();
                 group.add(line);
                 group.add(boxHelper);
-
+                
                 const center = new THREE.Vector3();
                 box.getCenter(center);
                 line.position.sub(center);
-
+                
                 group.position.set(objData.position.x, objData.position.y, 0.1);
                 group.rotation.z = THREE.MathUtils.degToRad(objData.properties.rotation || 0);
                 group.userData.id = objData.id;
-
+                
                 scene.add(group);
                 objectMeshes.push(group);
             });
         }
-
+        
         function updateObjectList() {
             objectList.innerHTML = '';
             sceneObjects.forEach(obj => {
                 const li = document.createElement('li');
                 li.dataset.id = obj.id;
                 if(selectedObject && selectedObject.data.id === obj.id) li.classList.add('selected');
-
+                
                 let name = obj.type.charAt(0).toUpperCase() + obj.type.slice(1);
                 if(obj.type === 'text') name += `: "${obj.content.substring(0, 15)}..."`;
                 if(obj.type === 'fractal') name += `: ${obj.properties.fractalType.replace(/_/g, ' ')}`;
                 li.innerHTML = `<span>${name}</span><button class="delete-btn" data-id="${obj.id}">&#x2716;</button>`;
-
+                
                 li.querySelector('.delete-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
                     deleteObject(obj.id);
@@ -508,7 +519,7 @@
                 objectList.appendChild(li);
             });
         }
-
+        
         function updatePropertiesPanel() {
             if (!selectedObject) {
                 propertiesPanel.style.display = 'none';
@@ -524,7 +535,7 @@
             const template = document.getElementById(templateId);
             if (!template) return;
             propertiesPanel.appendChild(template.content.cloneNode(true));
-
+            
             const obj = selectedObject.data;
             if (obj.type === 'text') {
                 document.getElementById('propInputText').value = obj.content;
@@ -576,7 +587,7 @@
             } else if (obj.type === 'fractal') {
                 const typeSelect = document.getElementById('propFractalType');
                 typeSelect.value = obj.properties.fractalType;
-
+                
                 const paramDivs = document.querySelectorAll('#fractalParamsContainer > div');
                 const showCorrectParams = () => {
                     paramDivs.forEach(div => div.style.display = 'none');
@@ -585,14 +596,14 @@
                 };
 
                 typeSelect.onchange = e => { selectedObject.data.properties.fractalType = e.target.value; showCorrectParams(); renderAllObjects(); updateObjectList();};
-
+                
                 document.getElementById('propFractalSize').oninput = e => {selectedObject.data.properties.size = parseFloat(e.target.value); renderAllObjects();};
                 document.getElementById('propKochIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propSierpinskiIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propHilbertIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propSpiralTurns').oninput = e => {selectedObject.data.properties.turns = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propSpiralSpacing').oninput = e => {selectedObject.data.properties.spacing = parseFloat(e.target.value); renderAllObjects();};
-
+                
                 showCorrectParams();
             }
 
@@ -609,7 +620,7 @@
                 };
             }
         }
-
+        
         // --- Punkt- und Pfadgenerierung für Vorschau ---
         const fractalGenerators = { /* ... Fractal math functions ... */ };
         function getObjectPoints(objData) {
@@ -648,16 +659,16 @@
                 writeSpeed: parseInt(document.getElementById('writeSpeed').value), travelSpeed: parseInt(document.getElementById('travelSpeed').value), zSpeed: 300
             };
             let gcode = ["; G-code generiert mit Interaktivem Plotter", "G21 ; Millimeter", "G90 ; Absolute Positionierung", "G28 ; Home All Axes", `G0 Z${config.travelZ.toFixed(2)} F${config.zSpeed}`];
-
+            
             sceneObjects.forEach(obj => {
                 gcode.push(`\n; Starte Objekt: ${obj.type} (ID: ${obj.id})`);
                 if (obj.type === 'text') gcode.push(...generateTextGcode(obj, config));
                 else if (obj.type === 'image') gcode.push(...generateImageGcode(obj, config));
                 else if (obj.type === 'fractal') gcode.push(...generateFractalGcode(obj, config));
             });
-
-            gcode.push(`\n; Plot beendet`, `G0 Z${(config.travelZ + 10).toFixed(2)} F${config.zSpeed}`, `G0 X0 Y10 F${travelSpeed}`, "M84 ; Motoren aus");
-
+            
+            gcode.push(`\n; Plot beendet`, `G0 Z${(config.travelZ + 10).toFixed(2)} F${config.zSpeed}`, `G0 X0 Y10 F${config.travelSpeed}`, "M84 ; Motoren aus");
+            
             gcodeOutput.textContent = gcode.join('\n');
             gcodeContainer.classList.remove('hidden');
             setupSimulation(gcode);
@@ -747,14 +758,42 @@
         function generateTextGcode(obj, config) {
             let gcode = [];
             const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
-            const segments = generateTextLineSegments(obj, true); // true = world coordinates
+            const { position, properties } = obj;
+            const { rotation } = properties;
+
+            // Get segments in local coordinates
+            const segments = generateTextLineSegments(obj, false);
+
+            // Create a temporary geometry to find the exact center, mirroring the preview logic
+            const points = [];
+            segments.forEach(seg => {
+                points.push(new THREE.Vector3(seg.p1.x, seg.p1.y, 0));
+                points.push(new THREE.Vector3(seg.p2.x, seg.p2.y, 0));
+            });
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            geometry.computeBoundingBox();
+            const center = new THREE.Vector3();
+            geometry.boundingBox.getCenter(center);
+
+            const angleRad = THREE.MathUtils.degToRad(rotation || 0);
+            const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
 
             segments.forEach(seg => {
+                // Apply all transformations: center, rotate, then translate
+                const p1_centered = { x: seg.p1.x - center.x, y: seg.p1.y - center.y };
+                const p2_centered = { x: seg.p2.x - center.x, y: seg.p2.y - center.y };
+
+                const p1_rot = { x: p1_centered.x * cosA - p1_centered.y * sinA, y: p1_centered.x * sinA + p1_centered.y * cosA };
+                const p2_rot = { x: p2_centered.x * cosA - p2_centered.y * sinA, y: p2_centered.x * sinA + p2_centered.y * cosA };
+
+                const p1_final = { x: p1_rot.x + position.x, y: p1_rot.y + position.y };
+                const p2_final = { x: p2_rot.x + position.x, y: p2_rot.y + position.y };
+
                 gcode.push(
                     `G0 Z${travelZ.toFixed(2)} F${zSpeed}`,
-            `G0 X${(seg.p1.x + 20).toFixed(2)} Y${(seg.p1.y + 20).toFixed(2)} F${travelSpeed}`,
+                    `G0 X${(p1_final.x + 20).toFixed(2)} Y${(p1_final.y + 20).toFixed(2)} F${travelSpeed}`,
                     `G1 Z${writingZ.toFixed(2)} F${zSpeed}`,
-            `G1 X${(seg.p2.x + 20).toFixed(2)} Y${(seg.p2.y + 20).toFixed(2)} F${writeSpeed}`
+                    `G1 X${(p2_final.x + 20).toFixed(2)} Y${(p2_final.y + 20).toFixed(2)} F${writeSpeed}`
                 );
             });
             return gcode;
@@ -897,9 +936,9 @@
              a.click();
              URL.revokeObjectURL(a.href);
         });
-
+        
         init();
-
+        
         // --- HILFSFUNKTIONEN (Fraktale & G-Code) ---
         // (Hier sind alle fehlenden Implementierungen)
         Object.assign(fractalGenerators, {
