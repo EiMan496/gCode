@@ -42,8 +42,7 @@
             <div class="grid grid-cols-3 gap-2">
                 <button id="addTextBtn" class="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700 transition">Text</button>
                 <button id="addFractalBtn" class="w-full px-4 py-2 bg-purple-600 text-white font-semibold rounded-md shadow-sm hover:bg-purple-700 transition">Muster</button>
-                <button id="addImgBtn" class="w-full px-4 py-2 bg-teal-600 text-white font-semibold rounded-md shadow-sm hover:bg-teal-700 transition">Bild</button>
-                <input type="file" id="imageUpload" accept="image/png, image/jpeg" class="hidden">
+                <button id="addDrawingBtn" class="w-full px-4 py-2 bg-green-600 text-white font-semibold rounded-md shadow-sm hover:bg-green-700 transition">Zeichnen</button>
             </div>
              <p class="text-xs text-gray-500 mt-2 text-center"><b>Steuerung:</b> Mausrad = Zoom, Linksklick = Drehen, <br><b>Strg + Linksklick</b> auf Objekt = Verschieben</p>
         </div>
@@ -111,7 +110,6 @@
                     <option value="hilbert_curve">Hilbert-Kurve</option>
                     <option value="archimedean_spiral">Archimedische Spirale</option>
                     <option value="fractal_plant">Fraktale Pflanze</option>
-                    <option value="fractal_tree">Fraktaler Baum</option>
                 </select>
             </div>
             <div class="mt-2">
@@ -124,36 +122,14 @@
                 <div data-fractal="hilbert_curve" style="display:none;"><label class="block config-label mb-1">Ordnung:</label><input type="number" id="propHilbertIterations" value="3" min="1" max="6" step="1" class="config-input"></div>
                 <div data-fractal="archimedean_spiral" style="display:none;"><label class="block config-label mb-1">Windungen:</label><input type="number" id="propSpiralTurns" value="5" min="1" step="1" class="config-input"><label class="block config-label mt-2 mb-1">Abstand:</label><input type="number" id="propSpiralSpacing" value="5" min="0.1" step="0.5" class="config-input"></div>
                 <div data-fractal="fractal_plant" style="display:none;"><label class="block config-label mb-1">Iterationen:</label><input type="number" id="propPlantIterations" value="4" min="1" max="6" step="1" class="config-input"></div>
-                <div data-fractal="fractal_tree" style="display:none;"><label class="block config-label mb-1">Iterationen:</label><input type="number" id="propTreeIterations" value="4" min="1" max="7" step="1" class="config-input"></div>
             </div>
             <div class="mt-2">
                 <label for="propRotation" class="block config-label mb-1">Rotation (°): <span id="rotationValue">0</span></label>
                 <input type="range" id="propRotation" min="0" max="360" value="0" class="w-full">
             </div>
         </template>
-        <template id="imagePropertiesTemplate">
-            <h2>Eigenschaften: Bild</h2>
-            <div>
-                <label for="propImageSize" class="block config-label mb-1">Größe (Breite in mm):</label>
-                <input type="number" id="propImageSize" value="100" min="10" step="10" class="config-input">
-            </div>
-            <div class="mt-2">
-                <label for="propImageThreshold" class="block config-label mb-1">Schärfe (Schwelle): <span id="thresholdValue">128</span></label>
-                <input type="range" id="propImageThreshold" min="1" max="254" value="128" class="w-full">
-            </div>
-             <div class="mt-2">
-                <label for="propImageHatchStyle" class="block config-label mb-1">Schraffur-Typ:</label>
-                <select id="propImageHatchStyle" class="config-input">
-                    <option value="horizontal">Horizontal</option>
-                    <option value="vertical">Vertikal</option>
-                    <option value="cross">Gekreuzt</option>
-                    <option value="ascii">ASCII Art</option>
-                </select>
-            </div>
-            <div class="mt-2">
-                <label for="propImageHatchDensity" class="block config-label mb-1">Liniendichte: <span id="densityValue">5</span></label>
-                <input type="range" id="propImageHatchDensity" min="1" max="20" value="5" class="w-full">
-            </div>
+        <template id="drawingPropertiesTemplate">
+            <h2>Eigenschaften: Zeichnung</h2>
             <div class="mt-2">
                 <label for="propRotation" class="block config-label mb-1">Rotation (°): <span id="rotationValue">0</span></label>
                 <input type="range" id="propRotation" min="0" max="360" value="0" class="w-full">
@@ -176,6 +152,9 @@
         let isDragging = false;
         let dragOffset = new THREE.Vector3();
         let currentView = 'design';
+        let isDrawingMode = false;
+        let currentDrawing = [];
+        let currentLine = null;
 
         // --- UI Elemente ---
         const propertiesPanel = document.getElementById('propertiesPanel');
@@ -185,7 +164,6 @@
         const downloadButton = document.getElementById('downloadButton');
         const gcodeContainer = document.getElementById('gcodeContainer');
         const gcodeOutput = document.getElementById('gcodeOutput');
-        const imageUpload = document.getElementById('imageUpload');
         const toggleViewBtn = document.getElementById('toggleViewBtn');
         
         // --- Initialisierung ---
@@ -265,6 +243,24 @@
 
         // --- Interaktions-Logik (Strg + Klick) ---
         function onPointerDown(event) {
+            if (isDrawingMode) {
+                isDragging = true; // Use isDragging to signify drawing a line
+                updatePointer(event);
+                raycaster.setFromCamera(pointer, camera);
+                const intersectionPoint = new THREE.Vector3();
+                raycaster.ray.intersectPlane(plane, intersectionPoint);
+
+                const path = [intersectionPoint];
+                currentDrawing.push(path);
+
+                // For live preview
+                const material = new THREE.LineBasicMaterial({ color: 0xffa500, linewidth: 2 });
+                const geometry = new THREE.BufferGeometry().setFromPoints([intersectionPoint]);
+                currentLine = new THREE.Line(geometry, material);
+                scene.add(currentLine);
+                return;
+            }
+
             if (event.ctrlKey) {
                 updatePointer(event);
                 raycaster.setFromCamera(pointer, camera);
@@ -286,6 +282,22 @@
         }
         
         function onPointerMove(event) {
+            if (isDrawingMode && isDragging) {
+                updatePointer(event);
+                raycaster.setFromCamera(pointer, camera);
+                const intersectionPoint = new THREE.Vector3();
+                raycaster.ray.intersectPlane(plane, intersectionPoint);
+
+                const currentPath = currentDrawing[currentDrawing.length - 1];
+                currentPath.push(intersectionPoint);
+
+                const allPoints = [];
+                currentDrawing.forEach(p => allPoints.push(...p));
+                currentLine.geometry.setFromPoints(allPoints);
+                currentLine.geometry.attributes.position.needsUpdate = true;
+                return;
+            }
+
             if (isDragging && selectedObject) {
                 event.preventDefault();
                 updatePointer(event);
@@ -320,6 +332,10 @@
         }
 
         function onPointerUp(event) {
+            if (isDrawingMode) {
+                isDragging = false;
+                return;
+            }
             isDragging = false;
             controls.enabled = true;
         }
@@ -352,10 +368,8 @@
                 case 'fractal':
                     newObjectData = { id: newId, type, position: defaultPosition, properties: { fractalType: 'koch_snowflake', size: 100, iterations: 3, turns: 5, spacing: 5, rotation: 0 } };
                     break;
-                case 'image':
-                    if (!data.imageData) return;
-                    const imgProps = { size: 100, threshold: 128, hatchStyle: 'horizontal', hatchDensity: 5, rotation: 0 };
-                    newObjectData = { id: newId, type, position: defaultPosition, properties: imgProps, originalImageData: data.imageData, tracedLines: traceImage(data.imageData, imgProps.threshold, imgProps.hatchStyle, imgProps.hatchDensity) };
+                case 'drawing':
+                    newObjectData = { id: newId, type, position: defaultPosition, properties: { rotation: 0 }, paths: data.paths };
                     break;
                 default: return;
             }
@@ -397,134 +411,6 @@
             updateObjectList();
         }
 
-        // --- Bildverarbeitung ---
-        function generateAsciiArt(imageData, density) {
-            const { data, width, height } = imageData;
-            const ramp = ' .:-=+*#%@';
-            const charPixelWidth = Math.max(1, 22 - density);
-            const charPixelHeight = charPixelWidth * 2;
-
-            let ascii = '';
-            for (let y = 0; y < height; y += charPixelHeight) {
-                let line = '';
-                for (let x = 0; x < width; x += charPixelWidth) {
-                    let totalBrightness = 0;
-                    let count = 0;
-                    for (let j = 0; j < charPixelHeight && (y + j) < height; j++) {
-                        for (let i = 0; i < charPixelWidth && (x + i) < width; i++) {
-                            const idx = ((y + j) * width + (x + i)) * 4;
-                            totalBrightness += 0.299 * data[idx] + 0.587 * data[idx+1] + 0.114 * data[idx+2];
-                            count++;
-                        }
-                    }
-                    const avgBrightness = count > 0 ? totalBrightness / count : 0;
-                    const rampIndex = Math.floor((avgBrightness / 255) * (ramp.length - 1));
-                    line += ramp[ramp.length - 1 - rampIndex];
-                }
-                ascii += line + '\n';
-            }
-            return ascii;
-        }
-
-        function regenerateImageData(objData) {
-            if (objData.properties.hatchStyle === 'ascii') {
-                objData.asciiContent = generateAsciiArt(objData.originalImageData, objData.properties.hatchDensity);
-                objData.tracedLines = [];
-            } else {
-                objData.asciiContent = null;
-                objData.tracedLines = traceImage(objData.originalImageData, objData.properties.threshold, objData.properties.hatchStyle, objData.properties.hatchDensity);
-            }
-        }
-
-        function handleImageUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
-                    const imageData = ctx.getImageData(0, 0, img.width, img.height);
-                    addObject('image', { imageData });
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-            event.target.value = '';
-        }
-
-        function traceImage(imageData, threshold, hatchStyle = 'horizontal', hatchDensity = 1) {
-            const lines = [];
-            const { data, width, height } = imageData;
-            hatchDensity = Math.max(1, hatchDensity);
-
-            const getBrightness = (x, y) => {
-                const i = (y * width + x) * 4;
-                return 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-            };
-
-            const traceDiagonal = (angle) => {
-                const step = hatchDensity;
-                const rad = angle * Math.PI / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-
-                for (let i = 0; i < width + height; i += step) {
-                    let inLine = false;
-                    let p1 = null;
-
-                    for (let j = 0; j < Math.max(width, height) * 2; j++) {
-                        const x = Math.round(i * cos - j * sin);
-                        const y = Math.round(i * sin + j * cos);
-
-                        if (x >= 0 && x < width && y >= 0 && y < height) {
-                            const brightness = getBrightness(x, y);
-                            if (!inLine && brightness < threshold) {
-                                inLine = true;
-                                p1 = { x, y };
-                            } else if (inLine && brightness >= threshold) {
-                                inLine = false;
-                                if (p1) {
-                                    lines.push({ x1: p1.x, y1: p1.y, x2: x, y2: y });
-                                    p1 = null;
-                                }
-                            }
-                        } else {
-                            if (inLine && p1) {
-                                inLine = false;
-                                lines.push({ x1: p1.x, y1: p1.y, x2: x, y2: y });
-                                p1 = null;
-                            }
-                        }
-                    }
-                     if (inLine && p1) {
-                        const x = Math.round(i * cos - (Math.max(width, height) * 2 -1) * sin);
-                        const y = Math.round(i * sin + (Math.max(width, height) * 2-1) * cos);
-                        lines.push({ x1: p1.x, y1: p1.y, x2: x, y2: y });
-                    }
-                }
-            };
-
-            switch (hatchStyle) {
-                case 'horizontal':
-                    traceDiagonal(0);
-                    break;
-                case 'vertical':
-                    traceDiagonal(90);
-                    break;
-                case 'cross':
-                    traceDiagonal(45);
-                    traceDiagonal(-45);
-                    break;
-                default:
-                    traceDiagonal(0);
-            }
-            return lines;
-        }
 
         // --- Rendering & UI Updates ---
         let simulationSegments = [];
@@ -628,39 +514,8 @@
                         };
                     }
                 });
-            } else if (obj.type === 'image') {
-                document.getElementById('propImageSize').value = obj.properties.size;
-                document.getElementById('propImageSize').oninput = e => { selectedObject.data.properties.size = parseFloat(e.target.value); renderAllObjects(); };
-                const thresholdSlider = document.getElementById('propImageThreshold');
-                const thresholdValue = document.getElementById('thresholdValue');
-                thresholdSlider.value = obj.properties.threshold;
-                thresholdValue.textContent = obj.properties.threshold;
-                thresholdSlider.oninput = e => {
-                    const newThreshold = parseInt(e.target.value);
-                    selectedObject.data.properties.threshold = newThreshold;
-                    thresholdValue.textContent = newThreshold;
-                    regenerateImageData(selectedObject.data);
-                    renderAllObjects();
-                };
-
-                document.getElementById('propImageHatchStyle').value = obj.properties.hatchStyle;
-                document.getElementById('propImageHatchStyle').onchange = e => {
-                    selectedObject.data.properties.hatchStyle = e.target.value;
-                    regenerateImageData(selectedObject.data);
-                    renderAllObjects();
-                };
-
-                const densitySlider = document.getElementById('propImageHatchDensity');
-                const densityValue = document.getElementById('densityValue');
-                densitySlider.value = obj.properties.hatchDensity;
-                densityValue.textContent = obj.properties.hatchDensity;
-                densitySlider.oninput = e => {
-                    const newDensity = parseInt(e.target.value);
-                    selectedObject.data.properties.hatchDensity = newDensity;
-                    densityValue.textContent = newDensity;
-                    regenerateImageData(selectedObject.data);
-                    renderAllObjects();
-                };
+            } else if (obj.type === 'drawing') {
+                // No specific properties for drawing yet, besides rotation
             } else if (obj.type === 'fractal') {
                 const typeSelect = document.getElementById('propFractalType');
                 typeSelect.value = obj.properties.fractalType;
@@ -679,7 +534,6 @@
                 document.getElementById('propSierpinskiIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propHilbertIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propPlantIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
-                document.getElementById('propTreeIterations').oninput = e => {selectedObject.data.properties.iterations = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propSpiralTurns').oninput = e => {selectedObject.data.properties.turns = parseInt(e.target.value); renderAllObjects();};
                 document.getElementById('propSpiralSpacing').oninput = e => {selectedObject.data.properties.spacing = parseFloat(e.target.value); renderAllObjects();};
                 
@@ -715,31 +569,6 @@
                         });
                     });
                 });
-            } else if (type === 'image') {
-                if (properties.hatchStyle === 'ascii' && objData.asciiContent) {
-                    const ascii_char_pixel_width = Math.max(1, 22 - properties.hatchDensity);
-                    const num_chars_wide = objData.originalImageData.width / ascii_char_pixel_width;
-                    const desired_total_width = properties.size;
-                    const scale = desired_total_width / (num_chars_wide * BASE_CHAR_WIDTH);
-
-                    const textObj = {
-                        content: objData.asciiContent,
-                        properties: { scale, charSpacing: 0, lineSpacing: 0, thickness: 0 }
-                    };
-                    const chars = generateTextLineStrokes(textObj); // Returns char objects now
-                    chars.forEach(char => {
-                        char.strokes.forEach(stroke => {
-                            stroke.forEach(seg => {
-                                allPoints.push(new THREE.Vector3(seg.p1.x, seg.p1.y, 0), new THREE.Vector3(seg.p2.x, seg.p2.y, 0));
-                            });
-                        });
-                    });
-                } else if (objData.tracedLines) {
-                    const scale = properties.size / objData.originalImageData.width;
-                    objData.tracedLines.forEach(line => {
-                        allPoints.push(new THREE.Vector3(line.x1 * scale, -line.y1 * scale, 0), new THREE.Vector3(line.x2 * scale, -line.y2 * scale, 0));
-                    });
-                }
             } else if (type === 'fractal') {
                 let pathData = getFractalPath(properties);
                 if (pathData.isLineSegments) {
@@ -747,6 +576,12 @@
                 } else {
                     for (let i = 0; i < pathData.data.length - 1; i++) allPoints.push(new THREE.Vector3(pathData.data[i].x, pathData.data[i].y, 0), new THREE.Vector3(pathData.data[i+1].x, pathData.data[i+1].y, 0));
                 }
+            } else if (type === 'drawing') {
+                objData.paths.forEach(path => {
+                    for (let i = 0; i < path.length - 1; i++) {
+                        allPoints.push(path[i], path[i+1]);
+                    }
+                });
             }
             return allPoints;
         }
@@ -765,8 +600,8 @@
             sceneObjects.forEach(obj => {
                 gcode.push(`\n; Starte Objekt: ${obj.type} (ID: ${obj.id})`);
                 if (obj.type === 'text') gcode.push(...generateTextGcode(obj, config));
-                else if (obj.type === 'image') gcode.push(...generateImageGcode(obj, config));
                 else if (obj.type === 'fractal') gcode.push(...generateFractalGcode(obj, config));
+                else if (obj.type === 'drawing') gcode.push(...generateDrawingGcode(obj, config));
             });
             
             gcode.push(`\n; Plot beendet`, `G0 Z${(config.travelZ + 10).toFixed(2)} F${config.zSpeed}`, `G0 X0 Y10 F${config.travelSpeed}`, "M84 ; Motoren aus");
@@ -1004,66 +839,6 @@
             return allChars;
         }
 
-        function generateImageGcode(obj, config) {
-            const { properties } = obj;
-            if (properties.hatchStyle === 'ascii' && obj.asciiContent) {
-                const ascii_char_pixel_width = Math.max(1, 22 - properties.hatchDensity);
-                const num_chars_wide = obj.originalImageData.width / ascii_char_pixel_width;
-                const desired_total_width = properties.size;
-                const scale = desired_total_width / (num_chars_wide * BASE_CHAR_WIDTH);
-
-                const textObj = {
-                    content: obj.asciiContent,
-                    position: obj.position,
-                    properties: {
-                        scale: scale,
-                        charSpacing: 0,
-                        lineSpacing: 0,
-                        thickness: 0,
-                        rotation: properties.rotation
-                    }
-                };
-                return generateTextGcode(textObj, config);
-            }
-
-            let gcode = [];
-            const { position, tracedLines, originalImageData } = obj;
-            const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
-            const { size, rotation } = properties;
-
-            const scale = size / originalImageData.width;
-            const allPoints = [];
-            tracedLines.forEach(line => {
-                allPoints.push(new THREE.Vector3(line.x1 * scale, -line.y1 * scale, 0));
-                allPoints.push(new THREE.Vector3(line.x2 * scale, -line.y2 * scale, 0));
-            });
-
-            if (allPoints.length === 0) return gcode;
-
-            const geometry = new THREE.BufferGeometry().setFromPoints(allPoints);
-            geometry.computeBoundingBox();
-            const center = new THREE.Vector3();
-            geometry.boundingBox.getCenter(center);
-
-            const angleRad = THREE.MathUtils.degToRad(rotation || 0);
-            const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
-
-            const transformPoint = (p) => {
-                const p_centered = { x: p.x - center.x, y: p.y - center.y };
-                const p_rot = { x: p_centered.x * cosA - p_centered.y * sinA, y: p_centered.x * sinA + p_centered.y * cosA };
-                return { x: p_rot.x + position.x, y: p_rot.y + position.y };
-            };
-
-            tracedLines.forEach(line => {
-                const p1_scaled = {x: line.x1 * scale, y: -line.y1 * scale};
-                const p2_scaled = {x: line.x2 * scale, y: -line.y2 * scale};
-
-                const p1_final = transformPoint(p1_scaled);
-                const p2_final = transformPoint(p2_scaled);
-                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${(p1_final.x).toFixed(2)} Y${(p1_final.y + 60).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${(p2_final.x).toFixed(2)} Y${(p2_final.y + 60).toFixed(2)} F${writeSpeed}`);
-            });
-            return gcode;
-        }
 
         function generateFractalGcode(obj, config) {
             let gcode = [];
@@ -1115,12 +890,80 @@
             return gcode;
         }
 
+        function generateDrawingGcode(obj, config) {
+            let gcode = [];
+            const { position, properties, paths } = obj;
+            const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
+            const { rotation } = properties;
+
+            const allPoints = [];
+            paths.forEach(path => {
+                path.forEach(p => allPoints.push(p.clone()));
+            });
+
+            if (allPoints.length === 0) return gcode;
+
+            const geometry = new THREE.BufferGeometry().setFromPoints(allPoints);
+            geometry.computeBoundingBox();
+            const center = new THREE.Vector3();
+            geometry.boundingBox.getCenter(center);
+
+            const angleRad = THREE.MathUtils.degToRad(rotation || 0);
+            const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
+
+            const transformPoint = (p) => {
+                const p_centered = p.clone().sub(center);
+                const p_rot = { x: p_centered.x * cosA - p_centered.y * sinA, y: p_centered.x * sinA + p_centered.y * cosA };
+                return { x: p_rot.x + position.x, y: p_rot.y + position.y };
+            };
+
+            paths.forEach(path => {
+                if (path.length < 2) return;
+                const startPoint = transformPoint(path[0]);
+                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`);
+                gcode.push(`G0 X${(startPoint.x).toFixed(2)} Y${(startPoint.y + 60).toFixed(2)} F${travelSpeed}`);
+                gcode.push(`G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
+                for (let i = 1; i < path.length; i++) {
+                    const point = transformPoint(path[i]);
+                    gcode.push(`G1 X${(point.x).toFixed(2)} Y${(point.y + 60).toFixed(2)} F${writeSpeed}`);
+                }
+            });
+
+            return gcode;
+        }
+
+        function toggleDrawingMode() {
+            isDrawingMode = !isDrawingMode;
+            const drawButton = document.getElementById('addDrawingBtn');
+            if (isDrawingMode) {
+                drawButton.textContent = 'Zeichnung beenden';
+                drawButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+                drawButton.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+                controls.enabled = false; // Disable camera controls while drawing
+            } else {
+                drawButton.textContent = 'Zeichnen';
+                drawButton.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+                drawButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                controls.enabled = true;
+
+                if (currentDrawing.length > 0 && currentDrawing.some(path => path.length > 1)) {
+                    addObject('drawing', { paths: currentDrawing });
+                }
+                currentDrawing = [];
+
+                if (currentLine) {
+                    scene.remove(currentLine);
+                    currentLine.geometry.dispose();
+                    currentLine.material.dispose();
+                    currentLine = null;
+                }
+            }
+        }
 
         // --- Event Listener Binding ---
         document.getElementById('addTextBtn').addEventListener('click', () => addObject('text'));
         document.getElementById('addFractalBtn').addEventListener('click', () => addObject('fractal'));
-        document.getElementById('addImgBtn').addEventListener('click', () => imageUpload.click());
-        imageUpload.addEventListener('change', handleImageUpload);
+        document.getElementById('addDrawingBtn').addEventListener('click', toggleDrawingMode);
         generateButton.addEventListener('click', generateFinalGCode);
         downloadButton.addEventListener('click', () => {
              const blob = new Blob([gcodeOutput.textContent], { type: 'text/plain' });
@@ -1208,9 +1051,6 @@
                 case 'fractal_plant':
                     path = fractalGenerators.expandLSystem('X', { 'X': 'F+[[X]-X]-F[-FX]+X', 'F': 'FF' }, iterations);
                     return fractalGenerators.interpretLSystem(path, 25, size / (Math.pow(2, iterations + 2)));
-                case 'fractal_tree':
-                    path = fractalGenerators.expandLSystem('0', { '1': '11', '0': '1[0]0' }, iterations);
-                    return fractalGenerators.interpretLSystem(path, 45, size / (Math.pow(2, iterations + 1)));
             }
             return {data, isLineSegments};
         }
