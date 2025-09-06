@@ -118,6 +118,7 @@
                 </div>
             </div>
             <button id="toggleDrawingModeBtn" class="w-full mt-4 px-4 py-2 bg-yellow-500 text-white font-semibold rounded-md shadow-sm hover:bg-yellow-600 transition">Zeichnen starten</button>
+            <p id="drawInstruction" class="text-xs text-gray-500 mt-2 text-center" style="display: none;">Zum Zeichnen/Radieren Shift-Taste gedrückt halten.</p>
         </template>
         <template id="fractalPropertiesTemplate">
             <h2>Eigenschaften: Muster</h2>
@@ -166,6 +167,7 @@
         let currentView = 'design';
         let editingDrawingId = null;
         let drawingTool = 'pen';
+        let eraserMesh = null;
 
         // --- UI Elemente ---
         const propertiesPanel = document.getElementById('propertiesPanel');
@@ -226,6 +228,12 @@
             raycaster = new THREE.Raycaster();
             pointer = new THREE.Vector2();
 
+            const eraserMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.5 });
+            const eraserGeometry = new THREE.CircleGeometry(5, 32); // 5mm radius
+            eraserMesh = new THREE.Mesh(eraserGeometry, eraserMaterial);
+            eraserMesh.visible = false;
+            scene.add(eraserMesh);
+
             renderer.domElement.addEventListener('pointerdown', onPointerDown, false);
             renderer.domElement.addEventListener('pointermove', onPointerMove, false);
             renderer.domElement.addEventListener('pointerup', onPointerUp, false);
@@ -255,10 +263,13 @@
         // --- Interaktions-Logik (Strg + Klick) ---
         function onPointerDown(event) {
             if (editingDrawingId && selectedObject && selectedObject.data.id === editingDrawingId) {
-                if (event.pointerType === 'pen' && event.pressure === 0) {
-                    return; // Don't draw on pen hover
-                }
-                updatePointer(event);
+                if (!event.shiftKey) {
+                    // Allow moving the object with Ctrl even when in edit mode
+                } else {
+                    if (event.pointerType === 'pen' && event.pressure === 0) {
+                        return; // Don't draw on pen hover
+                    }
+                    updatePointer(event);
                 raycaster.setFromCamera(pointer, camera);
                 const intersectionPoint = new THREE.Vector3();
                 if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
@@ -273,14 +284,7 @@
                             selectedObject.data.paths.push(newPath);
                             renderAllObjects();
                         } else if (drawingTool === 'eraser') {
-                            const eraserSize = 5; // mm
-                            let needsRender = false;
-                            selectedObject.data.paths = selectedObject.data.paths.filter(path => {
-                                const found = path.some(p => localPoint.distanceTo(p) < eraserSize);
-                                if (found) needsRender = true;
-                                return !found;
-                            });
-                            if (needsRender) renderAllObjects();
+                            erasePoints(localPoint);
                         }
                     }
                 }
@@ -307,8 +311,67 @@
             }
         }
         
+        function erasePoints(localPoint) {
+            const eraserSize = 5;
+            let needsRender = false;
+            const newPaths = [];
+
+            selectedObject.data.paths.forEach(path => {
+                const pointsToErase = new Set();
+                path.forEach((p, i) => {
+                    if (localPoint.distanceTo(p) < eraserSize) {
+                        pointsToErase.add(i);
+                    }
+                });
+
+                if (pointsToErase.size > 0) {
+                    needsRender = true;
+                    let currentSubPath = [];
+                    path.forEach((p, i) => {
+                        if (pointsToErase.has(i)) {
+                            if (currentSubPath.length > 1) {
+                                newPaths.push(currentSubPath);
+                            }
+                            currentSubPath = [];
+                        } else {
+                            currentSubPath.push(p);
+                        }
+                    });
+                    if (currentSubPath.length > 1) {
+                        newPaths.push(currentSubPath);
+                    }
+                } else {
+                    newPaths.push(path);
+                }
+            });
+
+            if (needsRender) {
+                selectedObject.data.paths = newPaths;
+                renderAllObjects();
+            }
+        }
+
         function onPointerMove(event) {
+            if (editingDrawingId && selectedObject && selectedObject.data.id === editingDrawingId && drawingTool === 'eraser') {
+                updatePointer(event);
+                raycaster.setFromCamera(pointer, camera);
+                const intersectionPoint = new THREE.Vector3();
+                if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
+                    eraserMesh.position.copy(intersectionPoint);
+                    eraserMesh.position.z = 0.2; // Keep it visible
+                    eraserMesh.visible = true;
+                } else {
+                    eraserMesh.visible = false;
+                }
+            } else if(eraserMesh) {
+                eraserMesh.visible = false;
+            }
+
              if (editingDrawingId && isDragging && selectedObject && selectedObject.data.id === editingDrawingId) {
+                if (!event.shiftKey) {
+                    isDragging = false;
+                    return;
+                }
                 updatePointer(event);
                 raycaster.setFromCamera(pointer, camera);
                 const intersectionPoint = new THREE.Vector3();
@@ -324,14 +387,7 @@
                                 renderAllObjects();
                             }
                         } else if (drawingTool === 'eraser') {
-                            const eraserSize = 5; // mm
-                            let needsRender = false;
-                            selectedObject.data.paths = selectedObject.data.paths.filter(path => {
-                                const found = path.some(p => localPoint.distanceTo(p) < eraserSize);
-                                if (found) needsRender = true;
-                                return !found;
-                            });
-                            if (needsRender) renderAllObjects();
+                            erasePoints(localPoint);
                         }
                     } else {
                         isDragging = false; // Stop drawing/erasing if mouse leaves the area
@@ -578,6 +634,8 @@
                 const toggleBtn = document.getElementById('toggleDrawingModeBtn');
                 toggleBtn.textContent = editingDrawingId === obj.id ? 'Zeichnen beenden' : 'Zeichnen starten';
                 toggleBtn.onclick = () => toggleDrawingEditMode(obj.id);
+
+                document.getElementById('drawInstruction').style.display = editingDrawingId === obj.id ? 'block' : 'none';
 
                 const penToolBtn = document.getElementById('penToolBtn');
                 const eraserToolBtn = document.getElementById('eraserToolBtn');
