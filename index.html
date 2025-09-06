@@ -100,6 +100,18 @@
                 <input type="range" id="propRotation" min="0" max="360" value="0" class="w-full">
             </div>
         </template>
+        <template id="drawingPropertiesTemplate">
+            <h2>Eigenschaften: Zeichnung</h2>
+            <div class="grid grid-cols-2 gap-4 mt-2">
+                <div><label for="propDrawWidth" class="block config-label mb-1">Breite (mm):</label><input type="number" id="propDrawWidth" value="100" min="10" step="5" class="config-input"></div>
+                <div><label for="propDrawHeight" class="block config-label mb-1">Höhe (mm):</label><input type="number" id="propDrawHeight" value="100" min="10" step="5" class="config-input"></div>
+            </div>
+            <div class="mt-2">
+                <label for="propRotation" class="block config-label mb-1">Rotation (°): <span id="rotationValue">0</span></label>
+                <input type="range" id="propRotation" min="0" max="360" value="0" class="w-full">
+            </div>
+            <button id="toggleDrawingModeBtn" class="w-full mt-4 px-4 py-2 bg-yellow-500 text-white font-semibold rounded-md shadow-sm hover:bg-yellow-600 transition">Zeichnen starten</button>
+        </template>
         <template id="fractalPropertiesTemplate">
             <h2>Eigenschaften: Muster</h2>
             <div>
@@ -128,13 +140,6 @@
                 <input type="range" id="propRotation" min="0" max="360" value="0" class="w-full">
             </div>
         </template>
-        <template id="drawingPropertiesTemplate">
-            <h2>Eigenschaften: Zeichnung</h2>
-            <div class="mt-2">
-                <label for="propRotation" class="block config-label mb-1">Rotation (°): <span id="rotationValue">0</span></label>
-                <input type="range" id="propRotation" min="0" max="360" value="0" class="w-full">
-            </div>
-        </template>
     </div>
 
     <script>
@@ -152,9 +157,7 @@
         let isDragging = false;
         let dragOffset = new THREE.Vector3();
         let currentView = 'design';
-        let isDrawingMode = false;
-        let currentDrawing = [];
-        let currentLine = null;
+        let editingDrawingId = null;
 
         // --- UI Elemente ---
         const propertiesPanel = document.getElementById('propertiesPanel');
@@ -243,22 +246,22 @@
 
         // --- Interaktions-Logik (Strg + Klick) ---
         function onPointerDown(event) {
-            if (isDrawingMode) {
-                isDragging = true; // Use isDragging to signify drawing a line
+            if (editingDrawingId && selectedObject && selectedObject.data.id === editingDrawingId) {
                 updatePointer(event);
                 raycaster.setFromCamera(pointer, camera);
                 const intersectionPoint = new THREE.Vector3();
-                raycaster.ray.intersectPlane(plane, intersectionPoint);
+                if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
+                    const localPoint = selectedObject.mesh.worldToLocal(intersectionPoint.clone());
+                    const { width, height } = selectedObject.data.properties;
 
-                const path = [intersectionPoint];
-                currentDrawing.push(path);
-
-                // For live preview
-                const material = new THREE.LineBasicMaterial({ color: 0xffa500, linewidth: 2 });
-                const geometry = new THREE.BufferGeometry().setFromPoints([intersectionPoint]);
-                currentLine = new THREE.Line(geometry, material);
-                scene.add(currentLine);
-                return;
+                    if (Math.abs(localPoint.x) <= width / 2 && Math.abs(localPoint.y) <= height / 2) {
+                        isDragging = true; // Use isDragging for drawing
+                        const newPath = [localPoint];
+                        selectedObject.data.paths.push(newPath);
+                        renderAllObjects();
+                    }
+                }
+                return; // Prevent other interactions
             }
 
             if (event.ctrlKey) {
@@ -282,19 +285,24 @@
         }
         
         function onPointerMove(event) {
-            if (isDrawingMode && isDragging) {
+             if (editingDrawingId && isDragging && selectedObject && selectedObject.data.id === editingDrawingId) {
                 updatePointer(event);
                 raycaster.setFromCamera(pointer, camera);
                 const intersectionPoint = new THREE.Vector3();
-                raycaster.ray.intersectPlane(plane, intersectionPoint);
+                if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
+                    const localPoint = selectedObject.mesh.worldToLocal(intersectionPoint.clone());
+                    const { width, height } = selectedObject.data.properties;
 
-                const currentPath = currentDrawing[currentDrawing.length - 1];
-                currentPath.push(intersectionPoint);
-
-                const allPoints = [];
-                currentDrawing.forEach(p => allPoints.push(...p));
-                currentLine.geometry.setFromPoints(allPoints);
-                currentLine.geometry.attributes.position.needsUpdate = true;
+                    if (Math.abs(localPoint.x) <= width / 2 && Math.abs(localPoint.y) <= height / 2) {
+                        const currentPath = selectedObject.data.paths[selectedObject.data.paths.length - 1];
+                        if(currentPath) {
+                            currentPath.push(localPoint);
+                            renderAllObjects();
+                        }
+                    } else {
+                        isDragging = false; // Stop drawing if mouse leaves the area
+                    }
+                }
                 return;
             }
 
@@ -332,7 +340,7 @@
         }
 
         function onPointerUp(event) {
-            if (isDrawingMode) {
+            if (editingDrawingId && isDragging) {
                 isDragging = false;
                 return;
             }
@@ -369,7 +377,7 @@
                     newObjectData = { id: newId, type, position: defaultPosition, properties: { fractalType: 'koch_snowflake', size: 100, iterations: 3, turns: 5, spacing: 5, rotation: 0 } };
                     break;
                 case 'drawing':
-                    newObjectData = { id: newId, type, position: defaultPosition, properties: { rotation: 0 }, paths: data.paths };
+                    newObjectData = { id: newId, type, position: defaultPosition, properties: { width: 100, height: 100, rotation: 0 }, paths: [] };
                     break;
                 default: return;
             }
@@ -483,6 +491,19 @@
             });
         }
         
+        function toggleDrawingEditMode(drawingId) {
+            if (editingDrawingId === drawingId) {
+                // Stop drawing
+                editingDrawingId = null;
+                controls.enabled = true;
+            } else {
+                // Start drawing
+                editingDrawingId = drawingId;
+                controls.enabled = false;
+            }
+            updatePropertiesPanel(); // To update the button text
+        }
+
         function updatePropertiesPanel() {
             if (!selectedObject) {
                 propertiesPanel.style.display = 'none';
@@ -515,7 +536,14 @@
                     }
                 });
             } else if (obj.type === 'drawing') {
-                // No specific properties for drawing yet, besides rotation
+                document.getElementById('propDrawWidth').value = obj.properties.width;
+                document.getElementById('propDrawHeight').value = obj.properties.height;
+                document.getElementById('propDrawWidth').oninput = e => { selectedObject.data.properties.width = parseFloat(e.target.value); renderAllObjects(); };
+                document.getElementById('propDrawHeight').oninput = e => { selectedObject.data.properties.height = parseFloat(e.target.value); renderAllObjects(); };
+
+                const toggleBtn = document.getElementById('toggleDrawingModeBtn');
+                toggleBtn.textContent = editingDrawingId === obj.id ? 'Zeichnen beenden' : 'Zeichnen starten';
+                toggleBtn.onclick = () => toggleDrawingEditMode(obj.id);
             } else if (obj.type === 'fractal') {
                 const typeSelect = document.getElementById('propFractalType');
                 typeSelect.value = obj.properties.fractalType;
@@ -577,9 +605,17 @@
                     for (let i = 0; i < pathData.data.length - 1; i++) allPoints.push(new THREE.Vector3(pathData.data[i].x, pathData.data[i].y, 0), new THREE.Vector3(pathData.data[i+1].x, pathData.data[i+1].y, 0));
                 }
             } else if (type === 'drawing') {
+                const { width, height } = properties;
+                const w2 = width / 2, h2 = height / 2;
+                allPoints.push(new THREE.Vector3(-w2, -h2, 0), new THREE.Vector3(w2, -h2, 0));
+                allPoints.push(new THREE.Vector3(w2, -h2, 0), new THREE.Vector3(w2, h2, 0));
+                allPoints.push(new THREE.Vector3(w2, h2, 0), new THREE.Vector3(-w2, h2, 0));
+                allPoints.push(new THREE.Vector3(-w2, h2, 0), new THREE.Vector3(-w2, -h2, 0));
+
                 objData.paths.forEach(path => {
                     for (let i = 0; i < path.length - 1; i++) {
-                        allPoints.push(path[i], path[i+1]);
+                        // The paths are stored relative to the drawing area's center.
+                        allPoints.push(new THREE.Vector3(path[i].x, path[i].y, 0), new THREE.Vector3(path[i+1].x, path[i+1].y, 0));
                     }
                 });
             }
@@ -840,6 +876,36 @@
         }
 
 
+        function generateDrawingGcode(obj, config) {
+            let gcode = [];
+            const { position, properties, paths } = obj;
+            const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
+            const { rotation } = properties;
+
+            const angleRad = THREE.MathUtils.degToRad(rotation || 0);
+            const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
+
+            const transformPoint = (p) => {
+                // p is already in local coordinates, so just rotate and translate
+                const p_rot = { x: p.x * cosA - p.y * sinA, y: p.x * sinA + p.y * cosA };
+                return { x: p_rot.x + position.x, y: p_rot.y + position.y };
+            };
+
+            paths.forEach(path => {
+                if (path.length < 2) return;
+                const startPoint = transformPoint(path[0]);
+                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`);
+                gcode.push(`G0 X${(startPoint.x).toFixed(2)} Y${(startPoint.y + 60).toFixed(2)} F${travelSpeed}`);
+                gcode.push(`G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
+                for (let i = 1; i < path.length; i++) {
+                    const point = transformPoint(path[i]);
+                    gcode.push(`G1 X${(point.x).toFixed(2)} Y${(point.y + 60).toFixed(2)} F${writeSpeed}`);
+                }
+            });
+
+            return gcode;
+        }
+
         function generateFractalGcode(obj, config) {
             let gcode = [];
             const { position, properties } = obj;
@@ -890,80 +956,11 @@
             return gcode;
         }
 
-        function generateDrawingGcode(obj, config) {
-            let gcode = [];
-            const { position, properties, paths } = obj;
-            const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
-            const { rotation } = properties;
-
-            const allPoints = [];
-            paths.forEach(path => {
-                path.forEach(p => allPoints.push(p.clone()));
-            });
-
-            if (allPoints.length === 0) return gcode;
-
-            const geometry = new THREE.BufferGeometry().setFromPoints(allPoints);
-            geometry.computeBoundingBox();
-            const center = new THREE.Vector3();
-            geometry.boundingBox.getCenter(center);
-
-            const angleRad = THREE.MathUtils.degToRad(rotation || 0);
-            const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
-
-            const transformPoint = (p) => {
-                const p_centered = p.clone().sub(center);
-                const p_rot = { x: p_centered.x * cosA - p_centered.y * sinA, y: p_centered.x * sinA + p_centered.y * cosA };
-                return { x: p_rot.x + position.x, y: p_rot.y + position.y };
-            };
-
-            paths.forEach(path => {
-                if (path.length < 2) return;
-                const startPoint = transformPoint(path[0]);
-                gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`);
-                gcode.push(`G0 X${(startPoint.x).toFixed(2)} Y${(startPoint.y + 60).toFixed(2)} F${travelSpeed}`);
-                gcode.push(`G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
-                for (let i = 1; i < path.length; i++) {
-                    const point = transformPoint(path[i]);
-                    gcode.push(`G1 X${(point.x).toFixed(2)} Y${(point.y + 60).toFixed(2)} F${writeSpeed}`);
-                }
-            });
-
-            return gcode;
-        }
-
-        function toggleDrawingMode() {
-            isDrawingMode = !isDrawingMode;
-            const drawButton = document.getElementById('addDrawingBtn');
-            if (isDrawingMode) {
-                drawButton.textContent = 'Zeichnung beenden';
-                drawButton.classList.remove('bg-green-600', 'hover:bg-green-700');
-                drawButton.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
-                controls.enabled = false; // Disable camera controls while drawing
-            } else {
-                drawButton.textContent = 'Zeichnen';
-                drawButton.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
-                drawButton.classList.add('bg-green-600', 'hover:bg-green-700');
-                controls.enabled = true;
-
-                if (currentDrawing.length > 0 && currentDrawing.some(path => path.length > 1)) {
-                    addObject('drawing', { paths: currentDrawing });
-                }
-                currentDrawing = [];
-
-                if (currentLine) {
-                    scene.remove(currentLine);
-                    currentLine.geometry.dispose();
-                    currentLine.material.dispose();
-                    currentLine = null;
-                }
-            }
-        }
 
         // --- Event Listener Binding ---
         document.getElementById('addTextBtn').addEventListener('click', () => addObject('text'));
         document.getElementById('addFractalBtn').addEventListener('click', () => addObject('fractal'));
-        document.getElementById('addDrawingBtn').addEventListener('click', toggleDrawingMode);
+        document.getElementById('addDrawingBtn').addEventListener('click', () => addObject('drawing'));
         generateButton.addEventListener('click', generateFinalGCode);
         downloadButton.addEventListener('click', () => {
              const blob = new Blob([gcodeOutput.textContent], { type: 'text/plain' });
