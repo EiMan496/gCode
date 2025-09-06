@@ -162,7 +162,8 @@
         let sceneObjects = [];
         let selectedObject = null;
         let objectMeshes = [];
-        let isDragging = false;
+        let isMovingObject = false;
+        let isDrawingOrErasing = false;
         let dragOffset = new THREE.Vector3();
         let currentView = 'design';
         let editingDrawingId = null;
@@ -262,14 +263,13 @@
 
         // --- Interaktions-Logik (Strg + Klick) ---
         function onPointerDown(event) {
-            if (editingDrawingId && selectedObject && selectedObject.data.id === editingDrawingId) {
-                if (!event.shiftKey) {
-                    // Allow moving the object with Ctrl even when in edit mode
-                } else {
-                    if (event.pointerType === 'pen' && event.pressure === 0) {
-                        return; // Don't draw on pen hover
-                    }
-                    updatePointer(event);
+            // 1. Drawing/Erasing Logic
+            if (editingDrawingId && event.shiftKey && selectedObject && selectedObject.data.id === editingDrawingId) {
+                if (event.pointerType === 'pen' && event.pressure === 0) {
+                    return; // Don't process hover events from a pen
+                }
+
+                updatePointer(event);
                 raycaster.setFromCamera(pointer, camera);
                 const intersectionPoint = new THREE.Vector3();
                 if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
@@ -277,7 +277,8 @@
                     const { width, height } = selectedObject.data.properties;
 
                     if (Math.abs(localPoint.x) <= width / 2 && Math.abs(localPoint.y) <= height / 2) {
-                        isDragging = true; // Use isDragging for drawing/erasing
+                        isDrawingOrErasing = true;
+                        controls.enabled = false;
 
                         if (drawingTool === 'pen') {
                             const newPath = [localPoint];
@@ -288,9 +289,10 @@
                         }
                     }
                 }
-                return; // Prevent other interactions
+                return; // Event handled
             }
 
+            // 2. Object Moving Logic
             if (event.ctrlKey) {
                 updatePointer(event);
                 raycaster.setFromCamera(pointer, camera);
@@ -301,13 +303,14 @@
                     const intersectedMesh = findParentGroup(intersects[0].object);
                     if (intersectedMesh) {
                         selectObjectById(intersectedMesh.userData.id);
-                        isDragging = true;
+                        isMovingObject = true;
                         controls.enabled = false;
                         const intersectionPoint = new THREE.Vector3();
                         raycaster.ray.intersectPlane(plane, intersectionPoint);
                         dragOffset.copy(intersectionPoint).sub(selectedObject.mesh.position);
                     }
                 }
+                return; // Event handled
             }
         }
         
@@ -352,6 +355,7 @@
         }
 
         function onPointerMove(event) {
+            // 1. Eraser visualization
             if (editingDrawingId && selectedObject && selectedObject.data.id === editingDrawingId && drawingTool === 'eraser') {
                 updatePointer(event);
                 raycaster.setFromCamera(pointer, camera);
@@ -367,11 +371,8 @@
                 eraserMesh.visible = false;
             }
 
-             if (editingDrawingId && isDragging && selectedObject && selectedObject.data.id === editingDrawingId) {
-                if (!event.shiftKey) {
-                    isDragging = false;
-                    return;
-                }
+            // 2. Drawing/Erasing logic
+            if (isDrawingOrErasing) {
                 updatePointer(event);
                 raycaster.setFromCamera(pointer, camera);
                 const intersectionPoint = new THREE.Vector3();
@@ -390,13 +391,13 @@
                             erasePoints(localPoint);
                         }
                     } else {
-                        isDragging = false; // Stop drawing/erasing if mouse leaves the area
+                        isDrawingOrErasing = false; // Stop if mouse leaves the area
                     }
                 }
-                return;
             }
 
-            if (isDragging && selectedObject) {
+            // 3. Object Moving Logic
+            if (isMovingObject) {
                 event.preventDefault();
                 updatePointer(event);
                 const intersectionPoint = new THREE.Vector3();
@@ -430,11 +431,8 @@
         }
 
         function onPointerUp(event) {
-            if (editingDrawingId && isDragging) {
-                isDragging = false;
-                return;
-            }
-            isDragging = false;
+            isDrawingOrErasing = false;
+            isMovingObject = false;
             controls.enabled = true;
         }
 
