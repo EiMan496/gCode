@@ -110,6 +110,13 @@
                 <label for="propRotation" class="block config-label mb-1">Rotation (°): <span id="rotationValue">0</span></label>
                 <input type="range" id="propRotation" min="0" max="360" value="0" class="w-full">
             </div>
+            <div class="mt-4">
+                <label class="block config-label mb-1">Werkzeug:</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="penToolBtn" class="px-4 py-2 text-sm font-semibold rounded-md shadow-sm transition">Stift</button>
+                    <button id="eraserToolBtn" class="px-4 py-2 text-sm font-semibold rounded-md shadow-sm transition">Radierer</button>
+                </div>
+            </div>
             <button id="toggleDrawingModeBtn" class="w-full mt-4 px-4 py-2 bg-yellow-500 text-white font-semibold rounded-md shadow-sm hover:bg-yellow-600 transition">Zeichnen starten</button>
         </template>
         <template id="fractalPropertiesTemplate">
@@ -158,6 +165,7 @@
         let dragOffset = new THREE.Vector3();
         let currentView = 'design';
         let editingDrawingId = null;
+        let drawingTool = 'pen';
 
         // --- UI Elemente ---
         const propertiesPanel = document.getElementById('propertiesPanel');
@@ -247,6 +255,9 @@
         // --- Interaktions-Logik (Strg + Klick) ---
         function onPointerDown(event) {
             if (editingDrawingId && selectedObject && selectedObject.data.id === editingDrawingId) {
+                if (event.pointerType === 'pen' && event.pressure === 0) {
+                    return; // Don't draw on pen hover
+                }
                 updatePointer(event);
                 raycaster.setFromCamera(pointer, camera);
                 const intersectionPoint = new THREE.Vector3();
@@ -255,10 +266,22 @@
                     const { width, height } = selectedObject.data.properties;
 
                     if (Math.abs(localPoint.x) <= width / 2 && Math.abs(localPoint.y) <= height / 2) {
-                        isDragging = true; // Use isDragging for drawing
-                        const newPath = [localPoint];
-                        selectedObject.data.paths.push(newPath);
-                        renderAllObjects();
+                        isDragging = true; // Use isDragging for drawing/erasing
+
+                        if (drawingTool === 'pen') {
+                            const newPath = [localPoint];
+                            selectedObject.data.paths.push(newPath);
+                            renderAllObjects();
+                        } else if (drawingTool === 'eraser') {
+                            const eraserSize = 5; // mm
+                            let needsRender = false;
+                            selectedObject.data.paths = selectedObject.data.paths.filter(path => {
+                                const found = path.some(p => localPoint.distanceTo(p) < eraserSize);
+                                if (found) needsRender = true;
+                                return !found;
+                            });
+                            if (needsRender) renderAllObjects();
+                        }
                     }
                 }
                 return; // Prevent other interactions
@@ -294,13 +317,24 @@
                     const { width, height } = selectedObject.data.properties;
 
                     if (Math.abs(localPoint.x) <= width / 2 && Math.abs(localPoint.y) <= height / 2) {
-                        const currentPath = selectedObject.data.paths[selectedObject.data.paths.length - 1];
-                        if(currentPath) {
-                            currentPath.push(localPoint);
-                            renderAllObjects();
+                        if (drawingTool === 'pen') {
+                            const currentPath = selectedObject.data.paths[selectedObject.data.paths.length - 1];
+                            if(currentPath) {
+                                currentPath.push(localPoint);
+                                renderAllObjects();
+                            }
+                        } else if (drawingTool === 'eraser') {
+                            const eraserSize = 5; // mm
+                            let needsRender = false;
+                            selectedObject.data.paths = selectedObject.data.paths.filter(path => {
+                                const found = path.some(p => localPoint.distanceTo(p) < eraserSize);
+                                if (found) needsRender = true;
+                                return !found;
+                            });
+                            if (needsRender) renderAllObjects();
                         }
                     } else {
-                        isDragging = false; // Stop drawing if mouse leaves the area
+                        isDragging = false; // Stop drawing/erasing if mouse leaves the area
                     }
                 }
                 return;
@@ -544,6 +578,25 @@
                 const toggleBtn = document.getElementById('toggleDrawingModeBtn');
                 toggleBtn.textContent = editingDrawingId === obj.id ? 'Zeichnen beenden' : 'Zeichnen starten';
                 toggleBtn.onclick = () => toggleDrawingEditMode(obj.id);
+
+                const penToolBtn = document.getElementById('penToolBtn');
+                const eraserToolBtn = document.getElementById('eraserToolBtn');
+
+                const updateToolButtons = () => {
+                    penToolBtn.className = drawingTool === 'pen' ? 'px-4 py-2 text-sm font-semibold rounded-md shadow-sm transition bg-blue-600 text-white' : 'px-4 py-2 text-sm font-semibold rounded-md shadow-sm transition bg-gray-200 text-gray-800';
+                    eraserToolBtn.className = drawingTool === 'eraser' ? 'px-4 py-2 text-sm font-semibold rounded-md shadow-sm transition bg-blue-600 text-white' : 'px-4 py-2 text-sm font-semibold rounded-md shadow-sm transition bg-gray-200 text-gray-800';
+                };
+
+                penToolBtn.onclick = () => {
+                    drawingTool = 'pen';
+                    updateToolButtons();
+                };
+                eraserToolBtn.onclick = () => {
+                    drawingTool = 'eraser';
+                    updateToolButtons();
+                };
+
+                updateToolButtons();
             } else if (obj.type === 'fractal') {
                 const typeSelect = document.getElementById('propFractalType');
                 typeSelect.value = obj.properties.fractalType;
