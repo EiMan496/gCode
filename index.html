@@ -166,7 +166,7 @@
         // --- Globale Konstanten & Definitionen ---
         const BED_WIDTH = 245, BED_HEIGHT = 260, PAPER_WIDTH = 210, PAPER_HEIGHT = 297;
         const BASE_CHAR_WIDTH = 10.0, BASE_CHAR_HEIGHT = 10.0;
-        const charPaths = {'A':[[{x:0,y:0},{x:5,y:10},{x:10,y:0}],[{x:2.5,y:5},{x:7.5,y:5}]],'B':[[{x:0,y:0},{x:0,y:10}],[{x:0,y:10},{x:6,y:10},{x:9,y:7.5},{x:6,y:5}],[{x:6,y:5},{x:9,y:2.5},{x:6,y:0},{x:0,y:0}]],'C':[[{x:9,y:9},{x:7,y:10},{x:3,y:10},{x:1,y:9},{x:0,y:7.5},{x:0,y:2.5},{x:1,y:1},{x:3,y:0},{x:7,y:0},{x:9,y:1},{x:10,y:2.5},{x:10,y:5}]],'D':[[{x:0,y:0},{x:0,y:10}],[{x:0,y:10},{x:6,y:10},{x:10,y:5},{x:6,y:0},{x:0,y:0}]],'E':[[{x:10,y:0},{x:0,y:0},{x:0,y:10},{x:10,y:10}],[{x:0,y:5},{x:7,y:5}]],'F':[[{x:0,y:0},{x:0,y:10},{x:10,y:10}],[{x:0,y:5},{x:7,y:5}]],'G':[[{x:9,y:9},{x:7,y:10},{x:3,y:10},{x:1,y:9},{x:0,y:7.5},{x:0,y:2.5},{x:1,y:1},{x:3,y:0},{x:7,y:0},{x:9,y:1},{x:10,y:2.5},{x:10,y:5}],[{x:5,y:5},{x:10,y:5}]],'H':[[{x:0,y:0},{x:0,y:10}],[{x:10,y:0},{x:10,y:10}],[{x:0,y:5},{x:10,y:5}]],'I':[[{x:5,y:0},{x:5,y:10}],[{x:2.5,y:0},{x:7.5,y:0}],[{x:2.5,y:10},{x:7.5,y:10}]],'J':[[{x:10,y:10},{x:10,y:2.5},{x:7.5,y:0},{x:2.5,y:0},{x:0,y:2.5}]],'K':[[{x:0,y:0},{x:0,y:10}],[{x:10,y:10},{x:2.5,y:5}],[{x:2.5,y:5},{x:10,y:0}]],'L':[[{x:0,y:10},{x:0,y:0},{x:10,y:0}]],'M':[[{x:0,y:0},{x:0,y:10},{x:5,y:5},{x:10,y:10},{x:10,y:0}]],'N':[[{x:0,y:0},{x:0,y:10},{x:10,y:0},{x:10,y:10}]],'O':[[{x:5,y:0},{x:9,y:1},{x:10,y:2.5},{x:10,y:7.5},{x:9,y:9},{x:5,y:10},{x:1,y:9},{x:0,y:7.5},{x:0,y:2.5},{x:1,y:1},{x:5,y:0}]],'P':[[{x:0,y:0},{x:0,y:10}],[{x:0,y:10},{x:6,y:10},{x:9,y:7.5},{x:6,y:5},{x:0,y:5}]],'Q':[[{x:5,y:0},{x:9,y:1},{x:10,y:2.5},{x:10,y:7.5},{x:9,y:9},{x:5,y:10},{x:1,y:9},{x:0,y:7.5},{x:0,y:2.5},{x:1,y:1},{x:5,y:0}],[{x:7.5,y:2.5},{x:10,y:0}]],'R':[[{x:0,y:0},{x:0,y:10}],[{x:0,y:10},{x:6,y:10},{x:9,y:7.5},{x:6,y:5},{x:0,y:5}],[{x:5,y:5},{x:10,y:0}]],'S':[[{x:9,y:9},{x:7,y:10},{x:3,y:10},{x:1,y:9},{x:0,y:7.5},{x:1,y:6},{x:4,y:5},{x:6,y:5},{x:9,y:4},{x:10,y:2.5},{x:9,y:1},{x:7,y:0},{x:3,y:0},{x:1,y:1},{x:0,y:2.5}]],'T':[[{x:5,y:0},{x:5,y:10}],[{x:0,y:10},{x:10,y:10}]],'U':[[{x:0,y:10},{x:0,y:2.5},{x:2.5,y:0},{x:7.5,y:0},{x:10,y:2.5},{x:10,y:10}]],'V':[[{x:0,y:10},{x:5,y:0},{x:10,y:10}]],'W':[[{x:0,y:10},{x:2.5,y:0},{x:5,y:5},{x:7.5,y:0},{x:10,y:10}]],'X':[[{x:0,y:0},{x:10,y:10}],[{x:10,y:0},{x:0,y:10}]],'Y':[[{x:0,y:10},{x:5,y:5}],[{x:10,y:10},{x:5,y:5}],[{x:5,y:5},{x:5,y:0}]],'Z':[[{x:0,y:10},{x:10,y:10},{x:0,y:0},{x:10,y:0}]],'0':[[{x:5,y:0},{x:9,y:1},{x:10,y:2.5},{x:10,y:7.5},{x:9,y:9},{x:5,y:10},{x:1,y:9},{x:0,y:7.5},{x:0,y:2.5},{x:1,y:1},{x:5,y:0}],[{x:2,y:2},{x:8,y:8}]],'1':[[{x:2.5,y:7.5},{x:5,y:10},{x:5,y:0}],[{x:2.5,y:0},{x:7.5,y:0}]],'2':[[{x:0,y:7.5},{x:2.5,y:10},{x:7.5,y:10},{x:10,y:7.5},{x:0,y:0},{x:10,y:0}]],'3':[[{x:0,y:7.5},{x:2.5,y:10},{x:7.5,y:10},{x:10,y:7.5},{x:7.5,y:5},{x:10,y:2.5},{x:7.5,y:0},{x:2.5,y:0},{x:0,y:2.5}],[{x:2,y:5},{x:7.5,y:5}]],'4':[[{x:0,y:10},{x:0,y:5},{x:10,y:5}],[{x:7.5,y:10},{x:7.5,y:0}]],'5':[[{x:10,y:10},{x:0,y:10},{x:0,y:5},{x:7.5,y:5},{x:10,y:2.5},{x:7.5,y:0},{x:2.5,y:0},{x:0,y:2.5}]],'6':[[{x:10,y:7.5},{x:7.5,y:10},{x:2.5,y:10},{x:0,y:5},{x:2.5,y:0},{x:7.5,y:0},{x:10,y:2.5},{x:7.5,y:5},{x:2.5,y:5}]],'7':[[{x:0,y:10},{x:10,y:10},{x:5,y:0}]],'8':[[{x:2.5,y:5},{x:0,y:7.5},{x:2.5,y:10},{x:7.5,y:10},{x:10,y:7.5},{x:7.5,y:5}],[{x:7.5,y:5},{x:10,y:2.5},{x:7.5,y:0},{x:2.5,y:0},{x:0,y:2.5},{x:2.5,y:5}]],'9':[[{x:0,y:2.5},{x:2.5,y:0},{x:7.5,y:0},{x:10,y:5},{x:7.5,y:10},{x:2.5,y:10},{x:0,y:7.5},{x:2.5,y:5},{x:7.5,y:5}]],'.':[[{x:5,y:0},{x:5,y:1}]],',':[[{x:5,y:1},{x:4,y:-1}]],'!':[[{x:5,y:10},{x:5,y:2.5}],[{x:5,y:0},{x:5,y:1}]],'.':[[{x:0,y:7.5},{x:2.5,y:10},{x:7.5,y:10},{x:10,y:7.5},{x:7.5,y:5},{x:5,y:5},{x:5,y:2.5}],[{x:5,y:0},{x:5,y:1}]]};
+        const charPaths = {'A':[[{x:0,y:0},{x:5,y:10},{x:10,y:0}],[{x:2.5,y:5},{x:7.5,y:5}]],'B':[[{x:0,y:0},{x:0,y:10}],[{x:0,y:10},{x:6,y:10},{x:9,y:7.5},{x:6,y:5}],[{x:6,y:5},{x:9,y:2.5},{x:6,y:0},{x:0,y:0}]],'C':[[{x:9,y:9},{x:7,y:10},{x:3,y:10},{x:1,y:9},{x:0,y:7.5},{x:0,y:2.5},{x:1,y:1},{x:3,y:0},{x:7,y:0},{x:9,y:1},{x:10,y:2.5},{x:10,y:5}]],'D':[[{x:0,y:0},{x:0,y:10}],[{x:0,y:10},{x:6,y:10},{x:10,y:5},{x:6,y:0},{x:0,y:0}]],'E':[[{x:10,y:0},{x:0,y:0},{x:0,y:10},{x:10,y:10}],[{x:0,y:5},{x:7,y:5}]],'F':[[{x:0,y:0},{x:0,y:10},{x:10,y:10}],[{x:0,y:5},{x:7,y:5}]],'G':[[{x:9,y:9},{x:7,y:10},{x:3,y:10},{x:1,y:9},{x:0,y:7.5},{x:0,y:2.5},{x:1,y:1},{x:3,y:0},{x:7,y:0},{x:9,y:1},{x:10,y:2.5},{x:10,y:5}],[{x:5,y:5},{x:10,y:5}]],'H':[[{x:0,y:0},{x:0,y:10}],[{x:10,y:0},{x:10,y:10}],[{x:0,y:5},{x:10,y:5}]],'I':[[{x:5,y:0},{x:5,y:10}],[{x:2.5,y:0},{x:7.5,y:0}],[{x:2.5,y:10},{x:7.5,y:10}]],'J':[[{x:10,y:10},{x:10,y:2.5},{x:7.5,y:0},{x:2.5,y:0},{x:0,y:2.5}]],'K':[[{x:0,y:0},{x:0,y:10}],[{x:10,y:10},{x:2.5,y:5}],[{x:2.5,y:5},{x:10,y:0}]],'L':[[{x:0,y:10},{x:0,y:0},{x:10,y:0}]],'M':[[{x:0,y:0},{x:0,y:10},{x:5,y:5},{x:10,y:10},{x:10,y:0}]],'N':[[{x:0,y:0},{x:0,y:10},{x:10,y:0},{x:10,y:10}]],'O':[[{x:5,y:0},{x:9,y:1},{x:10,y:2.5},{x:10,y:7.5},{x:9,y:9},{x:5,y:10},{x:1,y:9},{x:0,y:7.5},{x:0,y:2.5},{x:1,y:1},{x:5,y:0}]],'P':[[{x:0,y:0},{x:0,y:10}],[{x:0,y:10},{x:6,y:10},{x:9,y:7.5},{x:6,y:5},{x:0,y:5}]],'Q':[[{x:5,y:0},{x:9,y:1},{x:10,y:2.5},{x:10,y:7.5},{x:9,y:9},{x:5,y:10},{x:1,y:9},{x:0,y:7.5},{x:0,y:2.5},{x:1,y:1},{x:5,y:0}],[{x:7.5,y:2.5},{x:10,y:0}]],'R':[[{x:0,y:0},{x:0,y:10}],[{x:0,y:10},{x:6,y:10},{x:9,y:7.5},{x:6,y:5},{x:0,y:5}],[{x:5,y:5},{x:10,y:0}]],'S':[[{x:9,y:9},{x:7,y:10},{x:3,y:10},{x:1,y:9},{x:0,y:7.5},{x:1,y:6},{x:4,y:5},{x:6,y:5},{x:9,y:4},{x:10,y:2.5},{x:9,y:1},{x:7,y:0},{x:3,y:0},{x:1,y:1},{x:0,y:2.5}]],'T':[[{x:5,y:0},{x:5,y:10}],[{x:0,y:10},{x:10,y:10}]],'U':[[{x:0,y:10},{x:0,y:2.5},{x:2.5,y:0},{x:7.5,y:0},{x:10,y:2.5},{x:10,y:10}]],'V':[[{x:0,y:10},{x:5,y:0},{x:10,y:10}]],'W':[[{x:0,y:10},{x:2.5,y:0},{x:5,y:5},{x:7.5,y:0},{x:10,y:10}]],'X':[[{x:0,y:0},{x:10,y:10}],[{x:10,y:0},{x:0,y:10}]],'Y':[[{x:0,y:10},{x:5,y:5}],[{x:10,y:10},{x:5,y:5}],[{x:5,y:5},{x:5,y:0}]],'Z':[[{x:0,y:10},{x:10,y:10},{x:0,y:0},{x:10,y:0}]],'0':[[{x:5,y:0},{x:9,y:1},{x:10,y:2.5},{x:10,y:7.5},{x:9,y:9},{x:5,y:10},{x:1,y:9},{x:0,y:7.5},{x:0,y:2.5},{x:1,y:1},{x:5,y:0}],[{x:2,y:2},{x:8,y:8}]],'1':[[{x:2.5,y:7.5},{x:5,y:10},{x:5,y:0}],[{x:2.5,y:0},{x:7.5,y:0}]],'2':[[{x:0,y:7.5},{x:2.5,y:10},{x:7.5,y:10},{x:10,y:7.5},{x:0,y:0},{x:10,y:0}]],'3':[[{x:0,y:7.5},{x:2.5,y:10},{x:7.5,y:10},{x:10,y:7.5},{x:7.5,y:5},{x:10,y:2.5},{x:7.5,y:0},{x:2.5,y:0},{x:0,y:2.5}],[{x:2,y:5},{x:7.5,y:5}]],'4':[[{x:0,y:10},{x:0,y:5},{x:10,y:5}],[{x:7.5,y:10},{x:7.5,y:0}]],'5':[[{x:10,y:10},{x:0,y:10},{x:0,y:5},{x:7.5,y:5},{x:10,y:2.5},{x:7.5,y:0},{x:2.5,y:0},{x:0,y:2.5}]],'6':[[{x:10,y:7.5},{x:7.5,y:10},{x:2.5,y:10},{x:0,y:5},{x:2.5,y:0},{x:7.5,y:0},{x:10,y:2.5},{x:7.5,y:5},{x:2.5,y:5}]],'7':[[{x:0,y:10},{x:10,y:10},{x:5,y:0}]],'8':[[{x:2.5,y:5},{x:0,y:7.5},{x:2.5,y:10},{x:7.5,y:10},{x:10,y:7.5},{x:7.5,y:5}],[{x:7.5,y:5},{x:10,y:2.5},{x:7.5,y:0},{x:2.5,y:0},{x:0,y:2.5},{x:2.5,y:5}]],'9':[[{x:0,y:2.5},{x:2.5,y:0},{x:7.5,y:0},{x:10,y:5},{x:7.5,y:10},{x:2.5,y:10},{x:0,y:7.5},{x:2.5,y:5},{x:7.5,y:5}]],'.':[[{x:5,y:0},{x:5,y:1}]],',':[[{x:5,y:1},{x:4,y:-1}]],'!':[[{x:5,y:10},{x:5,y:2.5}],[{x:5,y:0},{x:5,y:1}]],':':[[{x:5,y:7.5},{x:5,y:8.5}],[{x:5,y:2.5},{x:5,y:3.5}]],'-':[[{x:2.5,y:5},{x:7.5,y:5}]],'=':[[{x:2.5,y:4},{x:7.5,y:4}],[{x:2.5,y:6},{x:7.5,y:6}]],'+':[[{x:5,y:2.5},{x:5,y:7.5}],[{x:2.5,y:5},{x:7.5,y:5}]],'*':[[{x:5,y:2.5},{x:5,y:7.5}],[{x:2.5,y:5},{x:7.5,y:5}],[{x:3,y:3},{x:7,y:7}],[{x:7,y:3},{x:3,y:7}]],'#':[[{x:3.5,y:0},{x:3.5,y:10}],[{x:6.5,y:0},{x:6.5,y:10}],[{x:0,y:3.5},{x:10,y:3.5}],[{x:0,y:6.5},{x:10,y:6.5}]],'%':[[{x:0,y:10},{x:10,y:0}],[{x:2.5,y:7.5},{x:4,y:9},{x:6,y:7.5},{x:4,y:6},{x:2.5,y:7.5}],[{x:6,y:2.5},{x:7.5,y:4},{x:9,y:2.5},{x:7.5,y:1},{x:6,y:2.5}]],'@':[[{x:5,y:0},{x:9,y:1},{x:10,y:2.5},{x:10,y:7.5},{x:9,y:9},{x:5,y:10},{x:1,y:9},{x:0,y:7.5},{x:0,y:5}],[{x:0,y:5},{x:5,y:5},{x:6.5,y:6.5},{x:6.5,y:3.5},{x:5,y:2.5},{x:2.5,y:2.5}]]};
 
         // --- three.js und App-Status Variablen ---
         let scene, camera, renderer, controls, raycaster, pointer, plane;
@@ -871,10 +871,9 @@
             const { position, properties } = obj;
             const { rotation } = properties;
 
-            // Get strokes in local coordinates
             const strokes = generateTextLineStrokes(obj);
+            if (strokes.length === 0) return gcode;
 
-            // Create a temporary geometry to find the exact center, mirroring the preview logic
             const allPoints = [];
             strokes.forEach(stroke => {
                 stroke.forEach(seg => {
@@ -896,19 +895,26 @@
                 return { x: p_rot.x + position.x, y: p_rot.y + position.y };
             };
 
+            let isFirstSegmentEver = true; // Flag for the very first line segment of the object
+
             strokes.forEach(stroke => {
                 if (stroke.length === 0) return;
-                // Transform the first point and move to it
+
                 const firstPoint = transformPoint(stroke[0].p1);
                 gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`);
                 gcode.push(`G0 X${(firstPoint.x).toFixed(2)} Y${(firstPoint.y + 60).toFixed(2)} F${travelSpeed}`);
-
-                // Lower pen and draw the rest of the stroke
                 gcode.push(`G1 Z${writingZ.toFixed(2)} F${zSpeed}`);
 
                 stroke.forEach(seg => {
                     const p2_final = transformPoint(seg.p2);
-                    gcode.push(`G1 X${(p2_final.x).toFixed(2)} Y${(p2_final.y + 60).toFixed(2)} F${writeSpeed}`);
+                    const command = `G1 X${(p2_final.x).toFixed(2)} Y${(p2_final.y + 60).toFixed(2)} F${writeSpeed}`;
+                    gcode.push(command);
+
+                    // If this is the very first segment of the entire text object, add it again.
+                    if (isFirstSegmentEver) {
+                        gcode.push(command);
+                        isFirstSegmentEver = false; // Ensure this only happens once
+                    }
                 });
             });
             return gcode;
@@ -996,36 +1002,39 @@
             }
 
             let gcode = [];
-            const { position, tracedLines, originalImageData, properties } = obj;
+            const { position, tracedLines, originalImageData } = obj;
             const { writingZ, travelZ, writeSpeed, travelSpeed, zSpeed } = config;
             const { size, rotation } = properties;
 
+            const scale = size / originalImageData.width;
             const allPoints = [];
             tracedLines.forEach(line => {
-                allPoints.push(new THREE.Vector3(line.x1, -line.y1, 0));
-                allPoints.push(new THREE.Vector3(line.x2, -line.y2, 0));
+                allPoints.push(new THREE.Vector3(line.x1 * scale, -line.y1 * scale, 0));
+                allPoints.push(new THREE.Vector3(line.x2 * scale, -line.y2 * scale, 0));
             });
+
+            if (allPoints.length === 0) return gcode;
 
             const geometry = new THREE.BufferGeometry().setFromPoints(allPoints);
             geometry.computeBoundingBox();
             const center = new THREE.Vector3();
             geometry.boundingBox.getCenter(center);
 
-            const scale = size / originalImageData.width;
-
             const angleRad = THREE.MathUtils.degToRad(rotation || 0);
             const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
 
             const transformPoint = (p) => {
-                const p_scaled = { x: p.x * scale, y: p.y * scale };
-                const p_centered = { x: p_scaled.x - (center.x * scale), y: p_scaled.y - (center.y * scale) };
+                const p_centered = { x: p.x - center.x, y: p.y - center.y };
                 const p_rot = { x: p_centered.x * cosA - p_centered.y * sinA, y: p_centered.x * sinA + p_centered.y * cosA };
                 return { x: p_rot.x + position.x, y: p_rot.y + position.y };
             };
 
             tracedLines.forEach(line => {
-                const p1_final = transformPoint({x: line.x1, y: -line.y1});
-                const p2_final = transformPoint({x: line.x2, y: -line.y2});
+                const p1_scaled = {x: line.x1 * scale, y: -line.y1 * scale};
+                const p2_scaled = {x: line.x2 * scale, y: -line.y2 * scale};
+
+                const p1_final = transformPoint(p1_scaled);
+                const p2_final = transformPoint(p2_scaled);
                 gcode.push(`G0 Z${travelZ.toFixed(2)} F${zSpeed}`, `G0 X${(p1_final.x).toFixed(2)} Y${(p1_final.y + 60).toFixed(2)} F${travelSpeed}`, `G1 Z${writingZ.toFixed(2)} F${zSpeed}`, `G1 X${(p2_final.x).toFixed(2)} Y${(p2_final.y + 60).toFixed(2)} F${writeSpeed}`);
             });
             return gcode;
